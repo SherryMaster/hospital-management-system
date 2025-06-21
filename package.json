@@ -1,0 +1,58 @@
+{
+  "name": "hospital-management-system",
+  "version": "1.0.0",
+  "description": "A comprehensive, production-grade Hospital Management System with Django REST API backend and React Material UI frontend",
+  "private": true,
+  "scripts": {
+    "dev": "bash scripts/dev-start.sh",
+    "dev:docker": "bash scripts/dev-start.sh --docker",
+    "dev:manage": "bash scripts/dev-manage.sh",
+    "setup": "bash scripts/dev-manage.sh setup",
+    "start": "npm run dev",
+    "stop": "bash scripts/dev-manage.sh stop",
+    "status": "bash scripts/dev-manage.sh status",
+    "health": "bash scripts/dev-manage.sh health",
+    "install:all": "bash scripts/dev-manage.sh install",
+    "clean": "bash scripts/dev-manage.sh clean",
+    "reset": "bash scripts/dev-manage.sh reset",
+    "db:health": "bash scripts/dev-manage.sh db-health",
+    "db:migrate": "bash scripts/dev-manage.sh migrate",
+    "db:reset": "bash scripts/dev-manage.sh db-reset",
+    "test:backend": "bash scripts/dev-manage.sh test-backend",
+    "test:frontend": "bash scripts/dev-manage.sh test-frontend",
+    "lint": "bash scripts/dev-manage.sh lint",
+    "format": "bash scripts/dev-manage.sh format",
+    "logs": "bash scripts/dev-manage.sh logs",
+    "logs:backend": "bash scripts/dev-manage.sh logs-backend",
+    "logs:frontend": "bash scripts/dev-manage.sh logs-frontend",
+    "info": "bash scripts/dev-manage.sh info"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/hospital-management-system.git"
+  },
+  "keywords": [
+    "hospital",
+    "management",
+    "healthcare",
+    "django",
+    "react",
+    "material-ui",
+    "rest-api",
+    "postgresql",
+    "docker"
+  ],
+  "author": "Your Name <your.email@example.com>",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0",
+    "python": ">=3.11.0"
+  },
+  "workspaces": [
+    "frontend"
+  ],
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
