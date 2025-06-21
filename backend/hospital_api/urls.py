@@ -29,12 +29,12 @@ urlpatterns = [
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 
-    # API endpoints (will be added as we create apps)
-    # path('api/auth/', include('apps.users.urls')),
-    # path('api/patients/', include('apps.patients.urls')),
-    # path('api/doctors/', include('apps.doctors.urls')),
-    # path('api/appointments/', include('apps.appointments.urls')),
-    # path('api/billing/', include('apps.billing.urls')),
+    # API endpoints
+    path('api/auth/', include('apps.accounts.urls')),
+    path('api/patients/', include('apps.patients.urls')),
+    path('api/doctors/', include('apps.doctors.urls')),
+    path('api/appointments/', include('apps.appointments.urls')),
+    path('api/billing/', include('apps.billing.urls')),
 ]
 
 # Serve media files in development

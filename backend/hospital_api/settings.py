@@ -47,12 +47,11 @@ THIRD_PARTY_APPS = [
 
 LOCAL_APPS = [
     'hospital_api',  # Main project app for management commands
-    # Will be added as we create them
-    # 'apps.users',
-    # 'apps.patients',
-    # 'apps.doctors',
-    # 'apps.appointments',
-    # 'apps.billing',
+    'apps.accounts',  # User accounts and authentication
+    'apps.patients',  # Patient management
+    'apps.doctors',   # Doctor management
+    'apps.appointments',  # Appointment scheduling
+    'apps.billing',   # Billing and invoicing
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -274,8 +273,8 @@ EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 # SECURITY SETTINGS
 # =============================================================================
 
-# Custom User Model (will be created later)
-# AUTH_USER_MODEL = 'users.User'
+# Custom User Model
+AUTH_USER_MODEL = 'accounts.User'
 
 # Security settings for production
 SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=False, cast=bool)
