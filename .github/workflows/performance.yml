@@ -1,0 +1,422 @@
+# Performance Testing Pipeline
+# Automated performance testing and monitoring
+
+name: Performance Testing
+
+on:
+  schedule:
+    # Run performance tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      test_duration:
+        description: 'Test duration in minutes'
+        required: false
+        default: '10'
+      concurrent_users:
+        description: 'Number of concurrent users'
+        required: false
+        default: '50'
+
+env:
+  TEST_DURATION: ${{ github.event.inputs.test_duration || '10' }}
+  CONCURRENT_USERS: ${{ github.event.inputs.concurrent_users || '50' }}
+
+jobs:
+  # Backend Performance Testing
+  backend-performance:
+    name: Backend Performance Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_hospital_management
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -r requirements/production.txt
+          pip install locust
+
+      - name: Set up test environment
+        run: |
+          cd backend
+          cp .env.example .env
+          echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test_hospital_management" >> .env
+          echo "REDIS_URL=redis://localhost:6379" >> .env
+          echo "SECRET_KEY=test-secret-key-for-performance" >> .env
+
+      - name: Run database migrations
+        run: |
+          cd backend
+          python manage.py migrate
+
+      - name: Load test data
+        run: |
+          cd backend
+          python manage.py loaddata fixtures/test_data.json
+
+      - name: Start Django server
+        run: |
+          cd backend
+          python manage.py runserver &
+          sleep 10
+
+      - name: Run Locust performance tests
+        run: |
+          cd backend
+          locust -f tests/performance/locustfile.py \
+            --host=http://localhost:8000 \
+            --users=${{ env.CONCURRENT_USERS }} \
+            --spawn-rate=5 \
+            --run-time=${TEST_DURATION}m \
+            --html=performance-report.html \
+            --csv=performance-results
+
+      - name: Upload performance results
+        uses: actions/upload-artifact@v3
+        with:
+          name: backend-performance-results
+          path: |
+            backend/performance-report.html
+            backend/performance-results_*.csv
+
+  # Frontend Performance Testing
+  frontend-performance:
+    name: Frontend Performance Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Build application
+        run: |
+          cd frontend
+          npm run build
+
+      - name: Install Lighthouse CI
+        run: npm install -g @lhci/cli
+
+      - name: Start frontend server
+        run: |
+          cd frontend
+          npm run preview &
+          sleep 10
+
+      - name: Run Lighthouse CI
+        run: |
+          lhci autorun --config=.lighthouserc.json
+
+      - name: Upload Lighthouse results
+        uses: actions/upload-artifact@v3
+        with:
+          name: lighthouse-results
+          path: .lighthouseci/
+
+  # Database Performance Testing
+  database-performance:
+    name: Database Performance Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_hospital_management
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -r requirements/production.txt
+          pip install pgbench
+
+      - name: Set up test environment
+        run: |
+          cd backend
+          cp .env.example .env
+          echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test_hospital_management" >> .env
+
+      - name: Run database migrations
+        run: |
+          cd backend
+          python manage.py migrate
+
+      - name: Load test data
+        run: |
+          cd backend
+          python manage.py loaddata fixtures/large_test_data.json
+
+      - name: Run database performance tests
+        run: |
+          cd backend
+          python manage.py test tests.performance.test_database_performance --verbosity=2
+
+      - name: Run pgbench tests
+        run: |
+          pgbench -h localhost -p 5432 -U postgres -d test_hospital_management \
+            -c 10 -j 2 -t 1000 -r
+
+      - name: Analyze slow queries
+        run: |
+          cd backend
+          python manage.py shell << 'EOF'
+          from django.db import connection
+          from django.conf import settings
+          
+          # Enable query logging
+          settings.LOGGING['loggers']['django.db.backends']['level'] = 'DEBUG'
+          
+          # Run some complex queries and measure performance
+          from accounts.models import Patient
+          from appointments.models import Appointment
+          
+          import time
+          
+          start_time = time.time()
+          patients = list(Patient.objects.select_related('user').prefetch_related('appointments')[:100])
+          end_time = time.time()
+          print(f"Patient query took: {end_time - start_time:.4f} seconds")
+          
+          start_time = time.time()
+          appointments = list(Appointment.objects.select_related('patient', 'doctor').filter(
+              appointment_date__gte='2025-01-01'
+          )[:100])
+          end_time = time.time()
+          print(f"Appointment query took: {end_time - start_time:.4f} seconds")
+          EOF
+
+  # Load Testing with Artillery
+  load-testing:
+    name: Load Testing
+    runs-on: ubuntu-latest
+    needs: [backend-performance]
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_hospital_management
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -r requirements/production.txt
+
+      - name: Install Artillery
+        run: npm install -g artillery
+
+      - name: Set up test environment
+        run: |
+          cd backend
+          cp .env.example .env
+          echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test_hospital_management" >> .env
+          echo "REDIS_URL=redis://localhost:6379" >> .env
+
+      - name: Run database migrations
+        run: |
+          cd backend
+          python manage.py migrate
+
+      - name: Start Django server
+        run: |
+          cd backend
+          python manage.py runserver &
+          sleep 10
+
+      - name: Run Artillery load tests
+        run: |
+          artillery run tests/performance/artillery-config.yml \
+            --output artillery-report.json
+
+      - name: Generate Artillery report
+        run: |
+          artillery report artillery-report.json \
+            --output artillery-report.html
+
+      - name: Upload Artillery results
+        uses: actions/upload-artifact@v3
+        with:
+          name: artillery-results
+          path: |
+            artillery-report.json
+            artillery-report.html
+
+  # Performance Analysis and Reporting
+  performance-analysis:
+    name: Performance Analysis
+    runs-on: ubuntu-latest
+    needs: [backend-performance, frontend-performance, database-performance, load-testing]
+    if: always()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+
+      - name: Analyze performance results
+        run: |
+          python scripts/performance/analyze_results.py \
+            --backend-results backend-performance-results/ \
+            --frontend-results lighthouse-results/ \
+            --load-results artillery-results/ \
+            --output performance-summary.json
+
+      - name: Generate performance report
+        run: |
+          python scripts/performance/generate_report.py \
+            --input performance-summary.json \
+            --output performance-report.html
+
+      - name: Check performance thresholds
+        run: |
+          python scripts/performance/check_thresholds.py \
+            --input performance-summary.json \
+            --thresholds scripts/performance/thresholds.json
+
+      - name: Upload performance report
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-report
+          path: |
+            performance-summary.json
+            performance-report.html
+
+      - name: Comment on PR with performance results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const performanceData = JSON.parse(fs.readFileSync('performance-summary.json', 'utf8'));
+            
+            const comment = `
+            ## 📊 Performance Test Results
+            
+            ### Backend Performance
+            - Average Response Time: ${performanceData.backend.avg_response_time}ms
+            - 95th Percentile: ${performanceData.backend.p95_response_time}ms
+            - Requests per Second: ${performanceData.backend.rps}
+            
+            ### Frontend Performance
+            - Lighthouse Score: ${performanceData.frontend.lighthouse_score}/100
+            - First Contentful Paint: ${performanceData.frontend.fcp}ms
+            - Largest Contentful Paint: ${performanceData.frontend.lcp}ms
+            
+            ### Database Performance
+            - Average Query Time: ${performanceData.database.avg_query_time}ms
+            - Slow Queries: ${performanceData.database.slow_queries}
+            
+            [View Full Report](${performanceData.report_url})
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+      - name: Notify performance issues
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          channel: '#performance'
+          text: 'Performance tests failed! Check the results for details.'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}

@@ -1,0 +1,391 @@
+# Automated Release Pipeline
+# Handles version tagging, changelog generation, and release deployment
+
+name: Release
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'README.md'
+      - 'docs/**'
+      - '.github/workflows/dependency-update.yml'
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Determine if release is needed
+  check-release:
+    name: Check Release Needed
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.check.outputs.should_release }}
+      new_version: ${{ steps.version.outputs.new_version }}
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if release is needed
+        id: check
+        run: |
+          # Check for conventional commits that warrant a release
+          if git log --oneline $(git describe --tags --abbrev=0)..HEAD | grep -E '^[a-f0-9]+ (feat|fix|perf|BREAKING CHANGE)'; then
+            echo "should_release=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_release=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Calculate new version
+        id: version
+        if: steps.check.outputs.should_release == 'true' || github.event_name == 'workflow_dispatch'
+        run: |
+          # Get current version
+          current_version=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          current_version=${current_version#v}
+          
+          # Determine version bump type
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            bump_type="${{ github.event.inputs.version_type }}"
+          else
+            # Auto-determine based on commit messages
+            if git log --oneline $(git describe --tags --abbrev=0)..HEAD | grep -q "BREAKING CHANGE"; then
+              bump_type="major"
+            elif git log --oneline $(git describe --tags --abbrev=0)..HEAD | grep -q "feat"; then
+              bump_type="minor"
+            else
+              bump_type="patch"
+            fi
+          fi
+          
+          # Calculate new version
+          IFS='.' read -ra VERSION_PARTS <<< "$current_version"
+          major=${VERSION_PARTS[0]}
+          minor=${VERSION_PARTS[1]}
+          patch=${VERSION_PARTS[2]}
+          
+          case $bump_type in
+            major)
+              major=$((major + 1))
+              minor=0
+              patch=0
+              ;;
+            minor)
+              minor=$((minor + 1))
+              patch=0
+              ;;
+            patch)
+              patch=$((patch + 1))
+              ;;
+          esac
+          
+          new_version="$major.$minor.$patch"
+          echo "new_version=$new_version" >> $GITHUB_OUTPUT
+
+  # Run full test suite before release
+  pre-release-tests:
+    name: Pre-Release Tests
+    runs-on: ubuntu-latest
+    needs: check-release
+    if: needs.check-release.outputs.should_release == 'true' || github.event_name == 'workflow_dispatch'
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_hospital_management
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -r requirements/production.txt
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Run backend tests
+        run: |
+          cd backend
+          cp .env.example .env
+          echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test_hospital_management" >> .env
+          echo "REDIS_URL=redis://localhost:6379" >> .env
+          echo "SECRET_KEY=test-secret-key-for-release" >> .env
+          python manage.py migrate
+          python manage.py test
+
+      - name: Run frontend tests
+        run: |
+          cd frontend
+          npm run test:coverage
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm run build
+
+  # Create release
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [check-release, pre-release-tests]
+    if: needs.check-release.outputs.should_release == 'true' || github.event_name == 'workflow_dispatch'
+
+    outputs:
+      release_tag: ${{ steps.create_tag.outputs.tag }}
+      release_url: ${{ steps.create_release.outputs.html_url }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get previous tag
+          previous_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          
+          # Generate changelog
+          if [ -n "$previous_tag" ]; then
+            changelog=$(git log --oneline --pretty=format:"- %s (%h)" $previous_tag..HEAD)
+          else
+            changelog=$(git log --oneline --pretty=format:"- %s (%h)")
+          fi
+          
+          # Save changelog to file
+          echo "# Changelog" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "## Version v${{ needs.check-release.outputs.new_version }}" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "$changelog" >> CHANGELOG.md
+          
+          # Set output for GitHub release
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$changelog" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Update version files
+        run: |
+          # Update backend version
+          echo "__version__ = '${{ needs.check-release.outputs.new_version }}'" > backend/hospital_management/__version__.py
+          
+          # Update frontend version
+          cd frontend
+          npm version ${{ needs.check-release.outputs.new_version }} --no-git-tag-version
+
+      - name: Commit version updates
+        run: |
+          git add .
+          git commit -m "chore: bump version to v${{ needs.check-release.outputs.new_version }}"
+
+      - name: Create and push tag
+        id: create_tag
+        run: |
+          tag="v${{ needs.check-release.outputs.new_version }}"
+          git tag -a $tag -m "Release $tag"
+          git push origin $tag
+          git push origin main
+          echo "tag=$tag" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.create_tag.outputs.tag }}
+          release_name: Release ${{ steps.create_tag.outputs.tag }}
+          body: |
+            ## Hospital Management System ${{ steps.create_tag.outputs.tag }}
+            
+            ### Changes
+            ${{ steps.changelog.outputs.changelog }}
+            
+            ### Docker Images
+            - Backend: `ghcr.io/${{ github.repository }}-backend:${{ steps.create_tag.outputs.tag }}`
+            - Frontend: `ghcr.io/${{ github.repository }}-frontend:${{ steps.create_tag.outputs.tag }}`
+            
+            ### Installation
+            ```bash
+            # Using Docker Compose
+            export VERSION=${{ steps.create_tag.outputs.tag }}
+            docker-compose -f docker-compose.prod.yml up -d
+            
+            # Using Kubernetes
+            kubectl apply -f k8s/
+            ```
+            
+            ### Documentation
+            - [Installation Guide](./INSTALLATION.md)
+            - [API Documentation](./API.md)
+            - [User Guide](./docs/USER_GUIDE.md)
+          draft: false
+          prerelease: false
+
+  # Build and push release images
+  build-release-images:
+    name: Build Release Images
+    runs-on: ubuntu-latest
+    needs: [create-release]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.create-release.outputs.release_tag }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile.prod
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:${{ needs.create-release.outputs.release_tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile.prod
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${{ needs.create-release.outputs.release_tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Deploy to production
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [create-release, build-release-images]
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.create-release.outputs.release_tag }}
+
+      - name: Deploy to production
+        run: |
+          echo "Deploying version ${{ needs.create-release.outputs.release_tag }} to production..."
+          # Add production deployment logic here
+          # This could include:
+          # - Updating Kubernetes manifests
+          # - Rolling deployment
+          # - Database migrations
+          # - Health checks
+
+      - name: Run post-deployment tests
+        run: |
+          echo "Running post-deployment tests..."
+          # Add post-deployment test logic here
+
+      - name: Notify successful deployment
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              "text": "🚀 Production Deployment Successful",
+              "attachments": [
+                {
+                  "color": "good",
+                  "fields": [
+                    {
+                      "title": "Version",
+                      "value": "${{ needs.create-release.outputs.release_tag }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Release Notes",
+                      "value": "${{ needs.create-release.outputs.release_url }}",
+                      "short": true
+                    }
+                  ]
+                }
+              ]
+            }
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+
+      - name: Notify deployment failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          channel: '#alerts'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}

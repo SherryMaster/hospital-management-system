@@ -1,0 +1,158 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:base",
+    "security:openssf-scorecard"
+  ],
+  "timezone": "UTC",
+  "schedule": ["before 6am on Monday"],
+  "labels": ["dependencies"],
+  "assignees": ["@SherryMaster"],
+  "reviewers": ["@SherryMaster"],
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "semanticCommits": "enabled",
+  "commitMessagePrefix": "chore:",
+  "commitMessageAction": "update",
+  "commitMessageTopic": "{{depName}}",
+  "commitMessageExtra": "to {{newVersion}}",
+  "packageRules": [
+    {
+      "matchPackagePatterns": ["*"],
+      "matchUpdateTypes": ["major"],
+      "addLabels": ["major-update"],
+      "reviewers": ["@SherryMaster"],
+      "schedule": ["before 6am on first day of month"]
+    },
+    {
+      "matchPackagePatterns": ["*"],
+      "matchUpdateTypes": ["minor"],
+      "addLabels": ["minor-update"],
+      "automerge": false
+    },
+    {
+      "matchPackagePatterns": ["*"],
+      "matchUpdateTypes": ["patch"],
+      "addLabels": ["patch-update"],
+      "automerge": true,
+      "automergeType": "pr"
+    },
+    {
+      "matchPackagePatterns": ["*"],
+      "matchUpdateTypes": ["pin", "digest"],
+      "addLabels": ["pin-update"],
+      "automerge": true,
+      "automergeType": "pr"
+    },
+    {
+      "matchDatasources": ["docker"],
+      "addLabels": ["docker"],
+      "schedule": ["before 6am on Monday"]
+    },
+    {
+      "matchDatasources": ["github-actions"],
+      "addLabels": ["github-actions"],
+      "schedule": ["before 6am on Monday"]
+    },
+    {
+      "matchPackageNames": [
+        "django",
+        "djangorestframework",
+        "psycopg2-binary",
+        "redis",
+        "celery"
+      ],
+      "addLabels": ["backend-core"],
+      "reviewers": ["@SherryMaster"],
+      "automerge": false
+    },
+    {
+      "matchPackageNames": [
+        "react",
+        "@types/react",
+        "react-dom",
+        "@types/react-dom",
+        "typescript",
+        "vite"
+      ],
+      "addLabels": ["frontend-core"],
+      "reviewers": ["@SherryMaster"],
+      "automerge": false
+    },
+    {
+      "matchPackagePatterns": ["^@mui/"],
+      "addLabels": ["material-ui"],
+      "groupName": "Material-UI packages",
+      "automerge": false
+    },
+    {
+      "matchPackagePatterns": ["^@testing-library/"],
+      "addLabels": ["testing"],
+      "groupName": "Testing Library packages",
+      "automerge": true
+    },
+    {
+      "matchPackagePatterns": ["eslint", "prettier"],
+      "addLabels": ["linting"],
+      "groupName": "Linting packages",
+      "automerge": true
+    },
+    {
+      "matchDepTypes": ["devDependencies"],
+      "addLabels": ["dev-dependencies"],
+      "automerge": true,
+      "automergeType": "pr"
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "addLabels": ["security"],
+    "assignees": ["@SherryMaster"],
+    "reviewers": ["@SherryMaster"],
+    "schedule": ["at any time"],
+    "prPriority": 10
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on Monday"],
+    "addLabels": ["lockfile-maintenance"],
+    "automerge": true,
+    "automergeType": "pr"
+  },
+  "python": {
+    "enabled": true,
+    "fileMatch": ["(^|/)requirements.*\\.txt$", "(^|/)setup\\.py$", "(^|/)pyproject\\.toml$"]
+  },
+  "npm": {
+    "enabled": true,
+    "fileMatch": ["(^|/)package\\.json$"]
+  },
+  "docker": {
+    "enabled": true,
+    "fileMatch": ["(^|/|\\.)Dockerfile$", "(^|/)Dockerfile\\.[^/]*$"]
+  },
+  "github-actions": {
+    "enabled": true,
+    "fileMatch": ["^\\.github/workflows/[^/]+\\.ya?ml$"]
+  },
+  "regexManagers": [
+    {
+      "fileMatch": ["(^|/)Dockerfile$"],
+      "matchStrings": [
+        "FROM (?<depName>.*?):(?<currentValue>.*?)@(?<currentDigest>sha256:[a-f0-9]+)\\s",
+        "FROM (?<depName>.*?):(?<currentValue>[^@\\s]+)\\s"
+      ],
+      "datasourceTemplate": "docker"
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "fileMatch": ["(^|/)requirements.*\\.txt$"],
+      "matchStrings": [
+        "(?<depName>[a-zA-Z0-9-_]+)==(?<currentValue>[^\\s]+)"
+      ],
+      "datasourceTemplate": "pypi"
+    }
+  ]
+}

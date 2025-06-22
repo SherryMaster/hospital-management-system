@@ -1,0 +1,326 @@
+# Prometheus Alert Rules for Hospital Management System
+# Comprehensive alerting for production monitoring
+
+groups:
+  # Application Health Alerts
+  - name: hospital_application_health
+    rules:
+      - alert: ApplicationDown
+        expr: up{job="hospital-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: backend
+          team: platform
+        annotations:
+          summary: "Hospital Management Backend is down"
+          description: "Backend service has been down for more than 1 minute"
+          runbook_url: "https://docs.hospital-management.com/runbooks/backend-down"
+
+      - alert: FrontendDown
+        expr: up{job="hospital-frontend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: frontend
+          team: platform
+        annotations:
+          summary: "Hospital Management Frontend is down"
+          description: "Frontend service has been down for more than 2 minutes"
+
+      - alert: DatabaseDown
+        expr: up{job="postgresql"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          service: database
+          team: platform
+        annotations:
+          summary: "PostgreSQL database is down"
+          description: "Database has been unreachable for more than 30 seconds"
+          runbook_url: "https://docs.hospital-management.com/runbooks/database-down"
+
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: warning
+          service: cache
+          team: platform
+        annotations:
+          summary: "Redis cache is down"
+          description: "Redis cache has been down for more than 1 minute"
+
+  # Performance Alerts
+  - name: hospital_performance
+    rules:
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(django_http_requests_latency_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: backend
+          team: backend
+        annotations:
+          summary: "High API response time"
+          description: "95th percentile response time is {{ $value }}s for the last 5 minutes"
+
+      - alert: HighErrorRate
+        expr: rate(django_http_requests_total{status=~"5.."}[5m]) / rate(django_http_requests_total[5m]) > 0.05
+        for: 3m
+        labels:
+          severity: critical
+          service: backend
+          team: backend
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} for the last 5 minutes"
+
+      - alert: DatabaseSlowQueries
+        expr: rate(postgresql_slow_queries_total[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          service: database
+          team: backend
+        annotations:
+          summary: "High number of slow database queries"
+          description: "{{ $value }} slow queries per second in the last 5 minutes"
+
+      - alert: HighDatabaseConnections
+        expr: postgresql_connections_active / postgresql_connections_max > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+          team: platform
+        annotations:
+          summary: "High database connection usage"
+          description: "Database connection usage is {{ $value | humanizePercentage }}"
+
+  # Resource Usage Alerts
+  - name: hospital_resources
+    rules:
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: infrastructure
+          team: platform
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value }}% for the last 5 minutes"
+
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: infrastructure
+          team: platform
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage is {{ $value }}% for the last 5 minutes"
+
+      - alert: LowDiskSpace
+        expr: (1 - (node_filesystem_avail_bytes / node_filesystem_size_bytes)) * 100 > 90
+        for: 2m
+        labels:
+          severity: critical
+          service: infrastructure
+          team: platform
+        annotations:
+          summary: "Low disk space on {{ $labels.instance }}"
+          description: "Disk usage is {{ $value }}% on {{ $labels.mountpoint }}"
+
+      - alert: HighDiskIOWait
+        expr: irate(node_cpu_seconds_total{mode="iowait"}[5m]) * 100 > 20
+        for: 5m
+        labels:
+          severity: warning
+          service: infrastructure
+          team: platform
+        annotations:
+          summary: "High disk I/O wait on {{ $labels.instance }}"
+          description: "I/O wait is {{ $value }}% for the last 5 minutes"
+
+  # Business Logic Alerts
+  - name: hospital_business_logic
+    rules:
+      - alert: HighFailedLogins
+        expr: rate(hospital_failed_login_attempts_total[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          service: security
+          team: security
+        annotations:
+          summary: "High number of failed login attempts"
+          description: "{{ $value }} failed login attempts per second in the last 5 minutes"
+
+      - alert: AppointmentBookingFailures
+        expr: rate(hospital_appointment_booking_failures_total[5m]) > 5
+        for: 3m
+        labels:
+          severity: warning
+          service: appointments
+          team: backend
+        annotations:
+          summary: "High appointment booking failure rate"
+          description: "{{ $value }} appointment booking failures per second"
+
+      - alert: PaymentProcessingFailures
+        expr: rate(hospital_payment_failures_total[5m]) > 1
+        for: 1m
+        labels:
+          severity: critical
+          service: billing
+          team: backend
+        annotations:
+          summary: "Payment processing failures detected"
+          description: "{{ $value }} payment failures per second in the last 5 minutes"
+
+      - alert: LowAppointmentAvailability
+        expr: hospital_available_appointment_slots < 10
+        for: 10m
+        labels:
+          severity: warning
+          service: appointments
+          team: operations
+        annotations:
+          summary: "Low appointment availability"
+          description: "Only {{ $value }} appointment slots available"
+
+  # Security Alerts
+  - name: hospital_security
+    rules:
+      - alert: SuspiciousActivity
+        expr: rate(hospital_suspicious_requests_total[5m]) > 5
+        for: 1m
+        labels:
+          severity: critical
+          service: security
+          team: security
+        annotations:
+          summary: "Suspicious activity detected"
+          description: "{{ $value }} suspicious requests per second detected"
+
+      - alert: UnauthorizedAccess
+        expr: rate(django_http_requests_total{status="403"}[5m]) > 20
+        for: 2m
+        labels:
+          severity: warning
+          service: security
+          team: security
+        annotations:
+          summary: "High number of unauthorized access attempts"
+          description: "{{ $value }} 403 responses per second in the last 5 minutes"
+
+      - alert: DataExportActivity
+        expr: rate(hospital_data_export_requests_total[5m]) > 2
+        for: 1m
+        labels:
+          severity: warning
+          service: security
+          team: security
+        annotations:
+          summary: "Unusual data export activity"
+          description: "{{ $value }} data export requests per second"
+
+  # Celery Worker Alerts
+  - name: hospital_celery
+    rules:
+      - alert: CeleryWorkerDown
+        expr: up{job="celery-worker"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: celery
+          team: backend
+        annotations:
+          summary: "Celery worker is down"
+          description: "Celery worker has been down for more than 2 minutes"
+
+      - alert: HighCeleryQueueLength
+        expr: celery_queue_length > 100
+        for: 5m
+        labels:
+          severity: warning
+          service: celery
+          team: backend
+        annotations:
+          summary: "High Celery queue length"
+          description: "Celery queue has {{ $value }} pending tasks"
+
+      - alert: CeleryTaskFailures
+        expr: rate(celery_task_failures_total[5m]) > 5
+        for: 3m
+        labels:
+          severity: warning
+          service: celery
+          team: backend
+        annotations:
+          summary: "High Celery task failure rate"
+          description: "{{ $value }} Celery task failures per second"
+
+  # External Dependencies
+  - name: hospital_external_dependencies
+    rules:
+      - alert: ExternalServiceDown
+        expr: probe_success{job="blackbox"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: external
+          team: platform
+        annotations:
+          summary: "External service check failed"
+          description: "External service {{ $labels.instance }} is not responding"
+
+      - alert: SSLCertificateExpiry
+        expr: probe_ssl_earliest_cert_expiry - time() < 86400 * 7
+        for: 1h
+        labels:
+          severity: warning
+          service: ssl
+          team: platform
+        annotations:
+          summary: "SSL certificate expiring soon"
+          description: "SSL certificate for {{ $labels.instance }} expires in {{ $value | humanizeDuration }}"
+
+  # Custom Application Metrics
+  - name: hospital_custom_metrics
+    rules:
+      - alert: LowPatientSatisfactionScore
+        expr: hospital_patient_satisfaction_score < 4.0
+        for: 30m
+        labels:
+          severity: warning
+          service: quality
+          team: operations
+        annotations:
+          summary: "Low patient satisfaction score"
+          description: "Patient satisfaction score is {{ $value }}/5.0"
+
+      - alert: HighAverageWaitTime
+        expr: hospital_average_wait_time_minutes > 30
+        for: 15m
+        labels:
+          severity: warning
+          service: operations
+          team: operations
+        annotations:
+          summary: "High average patient wait time"
+          description: "Average wait time is {{ $value }} minutes"
+
+      - alert: UnusualAppointmentCancellations
+        expr: rate(hospital_appointment_cancellations_total[1h]) > 10
+        for: 10m
+        labels:
+          severity: warning
+          service: appointments
+          team: operations
+        annotations:
+          summary: "High appointment cancellation rate"
+          description: "{{ $value }} appointment cancellations per hour"

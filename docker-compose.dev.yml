@@ -1,0 +1,266 @@
+# Development Docker Compose Configuration
+# Hospital Management System - Development Environment
+
+version: '3.8'
+
+services:
+  # PostgreSQL Database for Development
+  postgres_dev:
+    image: postgres:15-alpine
+    container_name: hospital_postgres_dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-hospital_management_dev}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./scripts/postgres-init-dev.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - hospital_dev_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-hospital_management_dev}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for Development
+  redis_dev:
+    image: redis:7-alpine
+    container_name: hospital_redis_dev
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_dev_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - hospital_dev_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Django Backend for Development
+  backend_dev:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: hospital_backend_dev
+    restart: unless-stopped
+    environment:
+      - DJANGO_SETTINGS_MODULE=hospital_management.settings.development
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-password}@postgres_dev:5432/${DB_NAME:-hospital_management_dev}
+      - REDIS_URL=redis://redis_dev:6379
+      - DEBUG=True
+      - ENVIRONMENT=development
+    volumes:
+      - ./backend:/app
+      - backend_dev_static:/app/staticfiles
+      - backend_dev_media:/app/media
+      - ./logs:/app/logs
+    ports:
+      - "8000:8000"
+    networks:
+      - hospital_dev_network
+    depends_on:
+      postgres_dev:
+        condition: service_healthy
+      redis_dev:
+        condition: service_healthy
+    command: >
+      sh -c "
+        python manage.py migrate &&
+        python manage.py collectstatic --noinput &&
+        python manage.py runserver 0.0.0.0:8000
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # React Frontend for Development
+  frontend_dev:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: hospital_frontend_dev
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=development
+      - REACT_APP_API_URL=http://localhost:8000
+      - REACT_APP_ENVIRONMENT=development
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - frontend_dev_build:/app/dist
+    ports:
+      - "3000:3000"
+      - "5173:5173"  # Vite dev server
+    networks:
+      - hospital_dev_network
+    depends_on:
+      - backend_dev
+    command: npm run dev -- --host 0.0.0.0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5173/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Celery Worker for Development
+  celery_worker_dev:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: hospital_celery_worker_dev
+    restart: unless-stopped
+    environment:
+      - DJANGO_SETTINGS_MODULE=hospital_management.settings.development
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-password}@postgres_dev:5432/${DB_NAME:-hospital_management_dev}
+      - REDIS_URL=redis://redis_dev:6379
+      - CELERY_BROKER_URL=redis://redis_dev:6379/4
+      - CELERY_RESULT_BACKEND=redis://redis_dev:6379/5
+    volumes:
+      - ./backend:/app
+      - ./logs:/app/logs
+    networks:
+      - hospital_dev_network
+    depends_on:
+      postgres_dev:
+        condition: service_healthy
+      redis_dev:
+        condition: service_healthy
+    command: celery -A hospital_management worker --loglevel=debug --reload
+
+  # Celery Beat for Development
+  celery_beat_dev:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: hospital_celery_beat_dev
+    restart: unless-stopped
+    environment:
+      - DJANGO_SETTINGS_MODULE=hospital_management.settings.development
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-password}@postgres_dev:5432/${DB_NAME:-hospital_management_dev}
+      - REDIS_URL=redis://redis_dev:6379
+      - CELERY_BROKER_URL=redis://redis_dev:6379/4
+      - CELERY_RESULT_BACKEND=redis://redis_dev:6379/5
+    volumes:
+      - ./backend:/app
+      - ./logs:/app/logs
+    networks:
+      - hospital_dev_network
+    depends_on:
+      postgres_dev:
+        condition: service_healthy
+      redis_dev:
+        condition: service_healthy
+    command: celery -A hospital_management beat --loglevel=debug --scheduler django_celery_beat.schedulers:DatabaseScheduler
+
+  # Flower for Celery Monitoring (Development)
+  flower_dev:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: hospital_flower_dev
+    restart: unless-stopped
+    environment:
+      - CELERY_BROKER_URL=redis://redis_dev:6379/4
+      - CELERY_RESULT_BACKEND=redis://redis_dev:6379/5
+    ports:
+      - "5555:5555"
+    networks:
+      - hospital_dev_network
+    depends_on:
+      - redis_dev
+    command: celery -A hospital_management flower --port=5555
+
+  # MailHog for Email Testing (Development)
+  mailhog_dev:
+    image: mailhog/mailhog:latest
+    container_name: hospital_mailhog_dev
+    restart: unless-stopped
+    ports:
+      - "1025:1025"  # SMTP server
+      - "8025:8025"  # Web interface
+    networks:
+      - hospital_dev_network
+
+  # Adminer for Database Management (Development)
+  adminer_dev:
+    image: adminer:latest
+    container_name: hospital_adminer_dev
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    networks:
+      - hospital_dev_network
+    depends_on:
+      - postgres_dev
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres_dev
+
+  # Redis Commander for Redis Management (Development)
+  redis_commander_dev:
+    image: rediscommander/redis-commander:latest
+    container_name: hospital_redis_commander_dev
+    restart: unless-stopped
+    environment:
+      - REDIS_HOSTS=local:redis_dev:6379
+    ports:
+      - "8081:8081"
+    networks:
+      - hospital_dev_network
+    depends_on:
+      - redis_dev
+
+  # Nginx for Development (Optional - for testing production-like setup)
+  nginx_dev:
+    image: nginx:1.24-alpine
+    container_name: hospital_nginx_dev
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./config/nginx/nginx-dev.conf:/etc/nginx/nginx.conf:ro
+      - backend_dev_static:/var/www/static:ro
+      - backend_dev_media:/var/www/media:ro
+      - frontend_dev_build:/var/www/html:ro
+    networks:
+      - hospital_dev_network
+    depends_on:
+      - backend_dev
+      - frontend_dev
+    profiles:
+      - nginx  # Optional service, activate with --profile nginx
+
+# Named Volumes for Development
+volumes:
+  postgres_dev_data:
+    driver: local
+  redis_dev_data:
+    driver: local
+  backend_dev_static:
+    driver: local
+  backend_dev_media:
+    driver: local
+  frontend_dev_build:
+    driver: local
+
+# Networks
+networks:
+  hospital_dev_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16

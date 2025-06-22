@@ -1,0 +1,333 @@
+# Artillery Load Testing Configuration
+# Hospital Management System API Load Testing
+
+config:
+  target: 'http://localhost:8000'
+  phases:
+    # Warm-up phase
+    - duration: 60
+      arrivalRate: 5
+      name: "Warm-up"
+    
+    # Ramp-up phase
+    - duration: 120
+      arrivalRate: 10
+      rampTo: 50
+      name: "Ramp-up"
+    
+    # Sustained load phase
+    - duration: 300
+      arrivalRate: 50
+      name: "Sustained load"
+    
+    # Peak load phase
+    - duration: 120
+      arrivalRate: 50
+      rampTo: 100
+      name: "Peak load"
+    
+    # Cool-down phase
+    - duration: 60
+      arrivalRate: 100
+      rampTo: 10
+      name: "Cool-down"
+
+  defaults:
+    headers:
+      Content-Type: 'application/json'
+      User-Agent: 'Artillery Load Test'
+
+  variables:
+    # Test data variables
+    usernames:
+      - "testuser1@example.com"
+      - "testuser2@example.com"
+      - "testuser3@example.com"
+      - "doctor1@hospital.com"
+      - "doctor2@hospital.com"
+    
+    passwords:
+      - "testpassword123"
+      - "doctorpassword123"
+    
+    appointment_reasons:
+      - "Regular checkup"
+      - "Follow-up consultation"
+      - "Emergency visit"
+      - "Routine examination"
+      - "Specialist consultation"
+    
+    specializations:
+      - "cardiology"
+      - "neurology"
+      - "orthopedics"
+      - "pediatrics"
+      - "dermatology"
+
+  plugins:
+    metrics-by-endpoint:
+      useOnlyRequestNames: true
+    
+    expect:
+      outputFormat: 'json'
+      
+  processor: "./artillery-processor.js"
+
+scenarios:
+  # Patient user journey
+  - name: "Patient Journey"
+    weight: 60
+    flow:
+      # Authentication
+      - post:
+          url: "/api/auth/login/"
+          json:
+            username: "{{ $randomPick(usernames) }}"
+            password: "{{ $randomPick(passwords) }}"
+          capture:
+            - json: "$.access"
+              as: "accessToken"
+          expect:
+            - statusCode: 200
+            - hasProperty: "access"
+      
+      # Set authorization header
+      - function: "setAuthHeader"
+      
+      # View dashboard
+      - get:
+          url: "/api/dashboard/"
+          name: "Patient Dashboard"
+          expect:
+            - statusCode: 200
+      
+      # List appointments
+      - get:
+          url: "/api/appointments/"
+          qs:
+            page: 1
+            page_size: 20
+          name: "List Appointments"
+          expect:
+            - statusCode: 200
+      
+      # View appointment details
+      - get:
+          url: "/api/appointments/{{ $randomInt(1, 100) }}/"
+          name: "Appointment Detail"
+          expect:
+            - statusCode: [200, 404]
+      
+      # Create new appointment
+      - post:
+          url: "/api/appointments/"
+          json:
+            doctor: "{{ $randomInt(1, 10) }}"
+            appointment_date: "2025-07-15"
+            appointment_time: "{{ $randomInt(9, 16) }}:00:00"
+            reason: "{{ $randomPick(appointment_reasons) }}"
+          name: "Create Appointment"
+          capture:
+            - json: "$.id"
+              as: "appointmentId"
+          expect:
+            - statusCode: [201, 400]
+      
+      # Update appointment if created successfully
+      - patch:
+          url: "/api/appointments/{{ appointmentId }}/"
+          json:
+            notes: "Updated via load test"
+          name: "Update Appointment"
+          ifTrue: "appointmentId"
+          expect:
+            - statusCode: [200, 404]
+      
+      # View medical records
+      - get:
+          url: "/api/medical-records/"
+          qs:
+            page: 1
+            page_size: 10
+          name: "Medical Records"
+          expect:
+            - statusCode: 200
+      
+      # Search functionality
+      - get:
+          url: "/api/appointments/search/"
+          qs:
+            search: "checkup"
+            date_from: "2025-06-01"
+            date_to: "2025-12-31"
+          name: "Search Appointments"
+          expect:
+            - statusCode: 200
+      
+      # View notifications
+      - get:
+          url: "/api/notifications/"
+          name: "Notifications"
+          expect:
+            - statusCode: 200
+      
+      # Logout
+      - post:
+          url: "/api/auth/logout/"
+          name: "Logout"
+          expect:
+            - statusCode: [200, 401]
+
+  # Doctor user journey
+  - name: "Doctor Journey"
+    weight: 25
+    flow:
+      # Doctor login
+      - post:
+          url: "/api/auth/login/"
+          json:
+            username: "doctor1@hospital.com"
+            password: "doctorpassword123"
+          capture:
+            - json: "$.access"
+              as: "accessToken"
+          expect:
+            - statusCode: 200
+      
+      # Set authorization header
+      - function: "setAuthHeader"
+      
+      # Doctor dashboard
+      - get:
+          url: "/api/dashboard/doctor/"
+          name: "Doctor Dashboard"
+          expect:
+            - statusCode: 200
+      
+      # Today's appointments
+      - get:
+          url: "/api/appointments/today/"
+          qs:
+            date: "2025-06-22"
+          name: "Today's Appointments"
+          expect:
+            - statusCode: 200
+      
+      # Patient list
+      - get:
+          url: "/api/patients/"
+          qs:
+            page: 1
+            page_size: 20
+          name: "Patient List"
+          expect:
+            - statusCode: 200
+      
+      # View patient details
+      - get:
+          url: "/api/patients/{{ $randomInt(1, 50) }}/"
+          name: "Patient Detail"
+          expect:
+            - statusCode: [200, 404]
+      
+      # Update appointment status
+      - patch:
+          url: "/api/appointments/{{ $randomInt(1, 100) }}/status/"
+          json:
+            status: "completed"
+          name: "Update Appointment Status"
+          expect:
+            - statusCode: [200, 404]
+      
+      # Add medical record
+      - post:
+          url: "/api/medical-records/"
+          json:
+            patient: "{{ $randomInt(1, 50) }}"
+            diagnosis: "Load test diagnosis"
+            treatment: "Load test treatment"
+            notes: "Created during load testing"
+          name: "Add Medical Record"
+          expect:
+            - statusCode: [201, 400]
+
+  # Admin user journey
+  - name: "Admin Journey"
+    weight: 10
+    flow:
+      # Admin login
+      - post:
+          url: "/api/auth/login/"
+          json:
+            username: "admin@hospital.com"
+            password: "adminpassword123"
+          capture:
+            - json: "$.access"
+              as: "accessToken"
+          expect:
+            - statusCode: 200
+      
+      # Set authorization header
+      - function: "setAuthHeader"
+      
+      # Admin dashboard
+      - get:
+          url: "/api/dashboard/admin/"
+          name: "Admin Dashboard"
+          expect:
+            - statusCode: 200
+      
+      # System reports
+      - get:
+          url: "/api/reports/system/"
+          name: "System Reports"
+          expect:
+            - statusCode: 200
+      
+      # User management
+      - get:
+          url: "/api/users/"
+          qs:
+            page: 1
+            page_size: 50
+          name: "User Management"
+          expect:
+            - statusCode: 200
+      
+      # Audit logs
+      - get:
+          url: "/api/audit/"
+          qs:
+            page: 1
+            page_size: 100
+          name: "Audit Logs"
+          expect:
+            - statusCode: 200
+      
+      # Generate report
+      - post:
+          url: "/api/reports/generate/"
+          json:
+            type: "monthly"
+            date_from: "2025-06-01"
+            date_to: "2025-06-30"
+          name: "Generate Report"
+          expect:
+            - statusCode: [201, 400]
+
+  # API stress test scenario
+  - name: "API Stress Test"
+    weight: 5
+    flow:
+      # Rapid-fire requests to test API limits
+      - loop:
+          - get:
+              url: "/api/health/"
+              name: "Health Check"
+          - get:
+              url: "/api/doctors/"
+              name: "List Doctors"
+          - get:
+              url: "/api/appointments/"
+              name: "List Appointments"
+        count: 10
