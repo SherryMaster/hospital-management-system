@@ -137,26 +137,294 @@ export const handleApiError = (error) => {
   if (error.response) {
     // Server responded with error status
     const { status, data } = error.response;
+
+    // Handle different error formats
+    let message = 'An error occurred';
+    let fieldErrors = {};
+
+    if (data) {
+      // Handle field-specific errors (like email, password)
+      if (typeof data === 'object' && !data.detail && !data.message) {
+        // Field-specific errors
+        fieldErrors = data;
+
+        // Extract first error message for general display
+        const firstError = Object.values(data)[0];
+        if (Array.isArray(firstError)) {
+          message = firstError[0];
+        } else if (typeof firstError === 'string') {
+          message = firstError;
+        }
+      } else {
+        // General error message
+        message = data.detail || data.message || data.non_field_errors?.[0] || message;
+      }
+    }
+
+    // Handle specific status codes
+    switch (status) {
+      case 400:
+        if (!message || message === 'An error occurred') {
+          message = 'Please check your input and try again.';
+        }
+        break;
+      case 401:
+        message = 'Authentication failed. Please check your credentials.';
+        break;
+      case 403:
+        message = 'You do not have permission to perform this action.';
+        break;
+      case 404:
+        message = 'The requested resource was not found.';
+        break;
+      case 500:
+        message = 'Server error. Please try again later.';
+        break;
+      default:
+        break;
+    }
+
     return {
       status,
-      message: data.message || data.detail || 'An error occurred',
-      errors: data.errors || {},
+      message,
+      fieldErrors,
+      errors: fieldErrors, // Keep for backward compatibility
     };
   } else if (error.request) {
     // Request was made but no response received
     return {
       status: 0,
-      message: 'Network error. Please check your connection.',
+      message: 'Network error. Please check your internet connection and try again.',
+      fieldErrors: {},
       errors: {},
     };
   } else {
     // Something else happened
     return {
       status: 0,
-      message: error.message || 'An unexpected error occurred',
+      message: error.message || 'An unexpected error occurred. Please try again.',
+      fieldErrors: {},
       errors: {},
     };
   }
+};
+
+// Specific API Services
+export const authService = {
+  login: async (credentials) => {
+    try {
+      const response = await api.post('/auth/login/', credentials);
+      const { access, refresh, user } = response.data;
+
+      tokenManager.setToken(access);
+      tokenManager.setRefreshToken(refresh);
+
+      return { data: { user, access, refresh }, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  register: async (userData) => {
+    try {
+      const response = await api.post('/auth/register/', userData);
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  logout: async () => {
+    try {
+      await api.post('/auth/logout/');
+      tokenManager.clearAll();
+      return { data: { message: 'Logged out successfully' }, error: null };
+    } catch (error) {
+      tokenManager.clearAll(); // Clear tokens even if logout fails
+      return { data: { message: 'Logged out successfully' }, error: null };
+    }
+  },
+
+  getCurrentUser: async () => {
+    try {
+      const response = await api.get('/auth/user/');
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+};
+
+export const userService = {
+  getUsers: async (params = {}) => {
+    try {
+      const response = await api.get('/users/', { params });
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  getUser: async (userId) => {
+    try {
+      const response = await api.get(`/users/${userId}/`);
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  createUser: async (userData) => {
+    try {
+      const response = await api.post('/users/', userData);
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  updateUser: async (userId, userData) => {
+    try {
+      const response = await api.patch(`/users/${userId}/`, userData);
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  deleteUser: async (userId) => {
+    try {
+      await api.delete(`/users/${userId}/`);
+      return { data: { message: 'User deleted successfully' }, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+};
+
+export const appointmentService = {
+  getAppointments: async (params = {}) => {
+    try {
+      const response = await api.get('/appointments/', { params });
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  getAppointment: async (appointmentId) => {
+    try {
+      const response = await api.get(`/appointments/${appointmentId}/`);
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  createAppointment: async (appointmentData) => {
+    try {
+      const response = await api.post('/appointments/', appointmentData);
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  updateAppointment: async (appointmentId, appointmentData) => {
+    try {
+      const response = await api.patch(`/appointments/${appointmentId}/`, appointmentData);
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  cancelAppointment: async (appointmentId, reason) => {
+    try {
+      const response = await api.patch(`/appointments/${appointmentId}/cancel/`, { reason });
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  getAvailableSlots: async (doctorId, date) => {
+    try {
+      const response = await api.get('/appointments/available-slots/', {
+        params: { doctor: doctorId, date },
+      });
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+};
+
+export const patientService = {
+  getPatients: async (params = {}) => {
+    try {
+      const response = await api.get('/patients/', { params });
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  getPatient: async (patientId) => {
+    try {
+      const response = await api.get(`/patients/${patientId}/`);
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  updatePatient: async (patientId, patientData) => {
+    try {
+      const response = await api.patch(`/patients/${patientId}/`, patientData);
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  getMedicalRecords: async (patientId) => {
+    try {
+      const response = await api.get(`/patients/${patientId}/medical-records/`);
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+};
+
+export const doctorService = {
+  getDoctors: async (params = {}) => {
+    try {
+      const response = await api.get('/doctors/', { params });
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  getDoctor: async (doctorId) => {
+    try {
+      const response = await api.get(`/doctors/${doctorId}/`);
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  updateAvailability: async (doctorId, availabilityData) => {
+    try {
+      const response = await api.patch(`/doctors/${doctorId}/availability/`, availabilityData);
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
 };
 
 export default api;

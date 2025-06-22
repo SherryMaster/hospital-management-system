@@ -8,12 +8,64 @@ from .models import User
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     """
-    Custom JWT token serializer that includes user information
+    Custom JWT token serializer that includes user information and supports email login
     """
-    
+    email = serializers.EmailField()
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Remove the username field and add email field
+        del self.fields['username']
+
     def validate(self, attrs):
+        # Convert email to username for authentication
+        email = attrs.get('email')
+        password = attrs.get('password')
+
+        if not email:
+            raise serializers.ValidationError({
+                'email': 'Email address is required.'
+            })
+
+        if not password:
+            raise serializers.ValidationError({
+                'password': 'Password is required.'
+            })
+
+        # Check if user exists with this email
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            raise serializers.ValidationError({
+                'email': 'No account found with this email address. Please check your email or create a new account.'
+            })
+
+        # Check if account is active
+        if not user.is_active:
+            raise serializers.ValidationError({
+                'non_field_errors': 'Your account has been deactivated. Please contact the administrator for assistance.'
+            })
+
+        # Replace email with username for parent validation
+        attrs['username'] = user.username
+        del attrs['email']
+
+        # Validate password using Django's authenticate function directly
+        from django.contrib.auth import authenticate
+
+        authenticated_user = authenticate(
+            username=user.username,
+            password=password
+        )
+
+        if not authenticated_user:
+            raise serializers.ValidationError({
+                'password': 'Incorrect password. Please check your password and try again.'
+            })
+
+        # If authentication successful, proceed with parent validation
         data = super().validate(attrs)
-        
+
         # Add custom user data to the token response
         data.update({
             'user': {
@@ -22,12 +74,13 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
                 'email': self.user.email,
                 'first_name': self.user.first_name,
                 'last_name': self.user.last_name,
+                'full_name': self.user.get_full_name(),
                 'role': self.user.role,
                 'is_verified': self.user.is_verified,
                 'profile_picture': self.user.profile_picture.url if self.user.profile_picture else None,
             }
         })
-        
+
         return data
     
     @classmethod
@@ -71,15 +124,33 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     
     def validate(self, attrs):
         """Validate password confirmation"""
-        if attrs['password'] != attrs['password_confirm']:
-            raise serializers.ValidationError("Passwords don't match")
+        if attrs.get('password') != attrs.get('password_confirm'):
+            raise serializers.ValidationError({
+                'password_confirm': 'Passwords do not match. Please ensure both password fields are identical.'
+            })
         return attrs
-    
+
     def validate_email(self, value):
         """Validate email uniqueness"""
+        if not value:
+            raise serializers.ValidationError('Email address is required.')
+
         if User.objects.filter(email=value.lower()).exists():
-            raise serializers.ValidationError("A user with this email already exists.")
+            raise serializers.ValidationError('An account with this email address already exists. Please use a different email or try logging in.')
+
         return value.lower()
+
+    def validate_first_name(self, value):
+        """Validate first name"""
+        if not value or not value.strip():
+            raise serializers.ValidationError('First name is required.')
+        return value.strip()
+
+    def validate_last_name(self, value):
+        """Validate last name"""
+        if not value or not value.strip():
+            raise serializers.ValidationError('Last name is required.')
+        return value.strip()
     
     def create(self, validated_data):
         """Create new user"""

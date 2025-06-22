@@ -53,6 +53,17 @@
     "frontend"
   ],
   "devDependencies": {
+    "@emotion/babel-plugin": "^11.13.5",
     "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "@date-io/date-fns": "^3.2.1",
+    "@mui/lab": "^7.0.0-beta.14",
+    "@mui/x-date-pickers": "^8.5.3",
+    "@mui/x-date-pickers-pro": "^8.5.3",
+    "date-fns": "^4.1.0",
+    "dayjs": "^1.11.13",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   }
 }

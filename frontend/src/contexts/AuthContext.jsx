@@ -5,8 +5,8 @@
  * Handles login, logout, token management, and user session.
  */
 
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
-import { apiMethods, tokenManager, handleApiError } from '../services/api';
+import React, { createContext, useContext, useReducer, useEffect, useCallback, useMemo } from 'react';
+import { authService, tokenManager, handleApiError } from '../services/api';
 
 // Initial state
 const initialState = {
@@ -97,15 +97,14 @@ export const AuthProvider = ({ children }) => {
       if (token) {
         try {
           // Verify token by making a request to get user info
-          // This endpoint will be created later
-          // const response = await apiMethods.get('/auth/me/');
-          // dispatch({
-          //   type: AUTH_ACTIONS.SET_USER,
-          //   payload: response.data,
-          // });
-          
-          // For now, just set loading to false
-          dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: false });
+          const { data, error } = await authService.getCurrentUser();
+          if (error) {
+            throw new Error(error.message);
+          }
+          dispatch({
+            type: AUTH_ACTIONS.SET_USER,
+            payload: data,
+          });
         } catch (error) {
           // Token is invalid, clear it
           tokenManager.clearAll();
@@ -120,87 +119,82 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // Login function
-  const login = async (credentials) => {
+  const login = useCallback(async (credentials) => {
     dispatch({ type: AUTH_ACTIONS.LOGIN_START });
 
-    try {
-      const response = await apiMethods.login(credentials);
-      const { access, refresh, user } = response.data;
+    const { data, error } = await authService.login(credentials);
 
-      // Store tokens
-      tokenManager.setToken(access);
-      tokenManager.setRefreshToken(refresh);
-
-      dispatch({
-        type: AUTH_ACTIONS.LOGIN_SUCCESS,
-        payload: { user },
-      });
-
-      return { success: true };
-    } catch (error) {
-      const errorInfo = handleApiError(error);
+    if (error) {
       dispatch({
         type: AUTH_ACTIONS.LOGIN_FAILURE,
-        payload: { error: errorInfo.message },
+        payload: { error: error.message },
       });
-      return { success: false, error: errorInfo.message };
+      return {
+        success: false,
+        error: error.message,
+        fieldErrors: error.fieldErrors || {}
+      };
     }
-  };
+
+    dispatch({
+      type: AUTH_ACTIONS.LOGIN_SUCCESS,
+      payload: { user: data.user },
+    });
+
+    return { success: true };
+  }, []);
 
   // Logout function
-  const logout = async () => {
-    try {
-      await apiMethods.logout();
-    } catch (error) {
-      // Even if logout fails on server, clear local tokens
+  const logout = useCallback(async () => {
+    const { error } = await authService.logout();
+    if (error) {
       console.error('Logout error:', error);
-    } finally {
-      tokenManager.clearAll();
-      dispatch({ type: AUTH_ACTIONS.LOGOUT });
     }
-  };
+    dispatch({ type: AUTH_ACTIONS.LOGOUT });
+  }, []);
 
   // Register function
-  const register = async (userData) => {
+  const register = useCallback(async (userData) => {
     dispatch({ type: AUTH_ACTIONS.LOGIN_START });
 
-    try {
-      const response = await apiMethods.register(userData);
-      const { access, refresh, user } = response.data;
+    const { data, error } = await authService.register(userData);
 
-      // Store tokens
-      tokenManager.setToken(access);
-      tokenManager.setRefreshToken(refresh);
-
-      dispatch({
-        type: AUTH_ACTIONS.LOGIN_SUCCESS,
-        payload: { user },
-      });
-
-      return { success: true };
-    } catch (error) {
-      const errorInfo = handleApiError(error);
+    if (error) {
       dispatch({
         type: AUTH_ACTIONS.LOGIN_FAILURE,
-        payload: { error: errorInfo.message },
+        payload: { error: error.message },
       });
-      return { success: false, error: errorInfo.message };
+      return {
+        success: false,
+        error: error.message,
+        fieldErrors: error.fieldErrors || {}
+      };
     }
-  };
+
+    // If registration includes auto-login
+    if (data.access && data.user) {
+      dispatch({
+        type: AUTH_ACTIONS.LOGIN_SUCCESS,
+        payload: { user: data.user },
+      });
+    }
+
+    return { success: true, data };
+  }, []);
 
   // Clear error function
-  const clearError = () => {
+  const clearError = useCallback(() => {
     dispatch({ type: AUTH_ACTIONS.CLEAR_ERROR });
-  };
+  }, []);
 
-  // Context value
-  const value = {
+  // Context value - memoized to prevent unnecessary re-renders
+  const value = useMemo(() => ({
     ...state,
     login,
     logout,
     register,
     clearError,
-  };
+  }), [state, login, logout, register, clearError]);
 
   return (
     <AuthContext.Provider value={value}>

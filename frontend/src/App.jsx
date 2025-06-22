@@ -7,48 +7,93 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
-import { CssBaseline, Box, Typography, Container, Paper } from '@mui/material';
+import { CssBaseline, Box } from '@mui/material';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
 import theme from './theme';
 import { AuthProvider } from './contexts/AuthContext';
+// import { AppProvider } from './contexts/AppContext';
+import { ProtectedRoute } from './components';
+// import NotificationSystem from './components/common/NotificationSystem';
+// import LoadingOverlay from './components/common/LoadingOverlay';
 
-// Temporary welcome component until we build the full app
-const WelcomeScreen = () => {
+// Import pages
+import LoginPage from './pages/auth/LoginPage';
+import RegisterPage from './pages/auth/RegisterPage';
+import DashboardPage from './pages/DashboardPage';
+import UnauthorizedPage from './pages/UnauthorizedPage';
+import { AppointmentBooking, AppointmentCalendar, AppointmentManagement } from './pages/appointments';
+import { PatientPortal } from './pages/patient';
+import { DoctorPortal } from './pages/doctor';
+
+// App Routes Component
+const AppRoutes = () => {
   return (
-    <Container maxWidth="md" sx={{ mt: 8 }}>
-      <Paper elevation={3} sx={{ p: 4, textAlign: 'center' }}>
-        <Typography variant="h3" component="h1" gutterBottom color="primary">
-          🏥 Hospital Management System
-        </Typography>
-        <Typography variant="h6" color="text.secondary" paragraph>
-          A comprehensive, production-grade hospital management solution
-        </Typography>
-        <Box sx={{ mt: 4 }}>
-          <Typography variant="body1" paragraph>
-            <strong>Backend:</strong> Django REST API with JWT Authentication
-          </Typography>
-          <Typography variant="body1" paragraph>
-            <strong>Frontend:</strong> React with Material-UI
-          </Typography>
-          <Typography variant="body1" paragraph>
-            <strong>Database:</strong> PostgreSQL (Neon)
-          </Typography>
-          <Typography variant="body1" paragraph>
-            <strong>Architecture:</strong> Decoupled client-server with independent scaling
-          </Typography>
-        </Box>
-        <Box sx={{ mt: 4, p: 2, bgcolor: 'success.light', borderRadius: 2 }}>
-          <Typography variant="h6" color="success.dark">
-            ✅ Frontend Environment Setup Complete!
-          </Typography>
-          <Typography variant="body2" color="success.dark" sx={{ mt: 1 }}>
-            React + Vite + Material-UI + Routing + API Integration Ready
-          </Typography>
-        </Box>
-      </Paper>
-    </Container>
+    <Routes>
+      {/* Public Routes */}
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
+      <Route path="/unauthorized" element={<UnauthorizedPage />} />
+
+      {/* Protected Routes */}
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            <DashboardPage />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Appointment Routes */}
+      <Route
+        path="/appointments/book"
+        element={
+          <ProtectedRoute>
+            <AppointmentBooking />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/appointments/calendar"
+        element={
+          <ProtectedRoute>
+            <AppointmentCalendar />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/appointments/manage"
+        element={
+          <ProtectedRoute requiredRoles={['admin', 'doctor', 'nurse', 'receptionist']}>
+            <AppointmentManagement />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Portal Routes */}
+      <Route
+        path="/patient/portal"
+        element={
+          <ProtectedRoute requiredRoles={['patient']}>
+            <PatientPortal />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/doctor/portal"
+        element={
+          <ProtectedRoute requiredRoles={['doctor']}>
+            <DoctorPortal />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Default redirects */}
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+    </Routes>
   );
 };
 
@@ -56,16 +101,17 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <LocalizationProvider dateAdapter={AdapterDateFns}>
+      <LocalizationProvider dateAdapter={AdapterDayjs}>
         <AuthProvider>
-          <Router>
-            <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
-              <Routes>
-                <Route path="/" element={<WelcomeScreen />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </Box>
-          </Router>
+          {/* <AppProvider> */}
+            <Router>
+              <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
+                <AppRoutes />
+                {/* <NotificationSystem />
+                <LoadingOverlay /> */}
+              </Box>
+            </Router>
+          {/* </AppProvider> */}
         </AuthProvider>
       </LocalizationProvider>
     </ThemeProvider>
