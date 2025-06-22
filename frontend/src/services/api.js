@@ -102,7 +102,7 @@ export const endpoints = {
     register: '/auth/register/',
   },
   // Users
-  users: '/users/',
+  users: '/auth/users/',
   // Patients
   patients: '/patients/',
   // Doctors
@@ -258,7 +258,7 @@ export const authService = {
 export const userService = {
   getUsers: async (params = {}) => {
     try {
-      const response = await api.get('/users/', { params });
+      const response = await api.get('/auth/users/', { params });
       return { data: response.data, error: null };
     } catch (error) {
       return { data: null, error: handleApiError(error) };
@@ -267,7 +267,7 @@ export const userService = {
 
   getUser: async (userId) => {
     try {
-      const response = await api.get(`/users/${userId}/`);
+      const response = await api.get(`/auth/users/${userId}/`);
       return { data: response.data, error: null };
     } catch (error) {
       return { data: null, error: handleApiError(error) };
@@ -276,7 +276,7 @@ export const userService = {
 
   createUser: async (userData) => {
     try {
-      const response = await api.post('/users/', userData);
+      const response = await api.post('/auth/users/', userData);
       return { data: response.data, error: null };
     } catch (error) {
       return { data: null, error: handleApiError(error) };
@@ -285,7 +285,7 @@ export const userService = {
 
   updateUser: async (userId, userData) => {
     try {
-      const response = await api.patch(`/users/${userId}/`, userData);
+      const response = await api.patch(`/auth/users/${userId}/`, userData);
       return { data: response.data, error: null };
     } catch (error) {
       return { data: null, error: handleApiError(error) };
@@ -294,7 +294,7 @@ export const userService = {
 
   deleteUser: async (userId) => {
     try {
-      await api.delete(`/users/${userId}/`);
+      await api.delete(`/auth/users/${userId}/`);
       return { data: { message: 'User deleted successfully' }, error: null };
     } catch (error) {
       return { data: null, error: handleApiError(error) };

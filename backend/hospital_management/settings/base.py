@@ -350,6 +350,10 @@ AUDIT_SETTINGS = {
     ],
 }
 
+# Phone Number Field Settings
+PHONENUMBER_DEFAULT_REGION = 'PK'  # Pakistan
+PHONENUMBER_DEFAULT_FORMAT = 'NATIONAL'
+
 # Notification Settings
 NOTIFICATION_SETTINGS = {
     'EMAIL_NOTIFICATIONS': True,
