@@ -23,11 +23,15 @@ urlpatterns = [
     # Health check and API info
     path('health/', views.health_check, name='health-check'),
     path('api/', views.api_info, name='api-info'),
+    path('api/health/', views.health_check, name='api-health-check'),
 
     # API Documentation
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+
+    # Dashboard endpoints
+    path('api/dashboard/', include('hospital_api.dashboard_urls')),
 
     # API endpoints
     path('api/auth/', include('apps.accounts.urls')),

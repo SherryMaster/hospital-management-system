@@ -296,6 +296,10 @@ HOSPITAL_EMAIL = config('HOSPITAL_EMAIL', default='')
 DEFAULT_APPOINTMENT_DURATION = config('DEFAULT_APPOINTMENT_DURATION', default=30, cast=int)  # minutes
 APPOINTMENT_BOOKING_ADVANCE_DAYS = config('APPOINTMENT_BOOKING_ADVANCE_DAYS', default=30, cast=int)
 
+# Phone Number Field Settings
+PHONENUMBER_DEFAULT_REGION = 'PK'  # Pakistan
+PHONENUMBER_DEFAULT_FORMAT = 'NATIONAL'
+
 # Create logs directory if it doesn't exist
 LOGS_DIR = BASE_DIR / 'logs'
 LOGS_DIR.mkdir(exist_ok=True)
