@@ -32,6 +32,10 @@ import UsersPage from './pages/admin/UsersPage';
 import PatientsPage from './pages/PatientsPage';
 import DoctorsPage from './pages/DoctorsPage';
 import AppointmentsPage from './pages/AppointmentsPage';
+import AnalyticsPage from './pages/AnalyticsPage';
+import MedicalRecordsPage from './pages/MedicalRecordsPage';
+import BillingPage from './pages/BillingPage';
+import SettingsPage from './pages/SettingsPage';
 
 // App Routes Component
 const AppRoutes = () => {
@@ -126,6 +130,40 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute requiredRoles={['doctor']}>
             <DoctorPortal />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Additional Feature Routes */}
+      <Route
+        path="/analytics"
+        element={
+          <ProtectedRoute requiredRoles={['admin']}>
+            <AnalyticsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/medical-records"
+        element={
+          <ProtectedRoute requiredRoles={['admin', 'doctor', 'nurse']}>
+            <MedicalRecordsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/billing"
+        element={
+          <ProtectedRoute requiredRoles={['admin', 'receptionist']}>
+            <BillingPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute requiredRoles={['admin', 'doctor', 'nurse', 'receptionist', 'pharmacist', 'patient']}>
+            <SettingsPage />
           </ProtectedRoute>
         }
       />
