@@ -172,7 +172,7 @@ export const AuthProvider = ({ children }) => {
     }
 
     // If registration includes auto-login
-    if (data.access && data.user) {
+    if (data.tokens && data.user) {
       dispatch({
         type: AUTH_ACTIONS.LOGIN_SUCCESS,
         payload: { user: data.user },

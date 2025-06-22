@@ -114,7 +114,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'username', 'email', 'password', 'password_confirm',
+            'email', 'password', 'password_confirm',
             'first_name', 'last_name', 'role', 'phone_number',
             'date_of_birth', 'gender'
         ]
@@ -158,7 +158,20 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         """Create new user"""
         validated_data.pop('password_confirm')
         password = validated_data.pop('password')
-        
+
+        # Auto-generate username from email
+        email = validated_data['email']
+        base_username = email.split('@')[0]
+        username = base_username
+
+        # Ensure username is unique
+        counter = 1
+        while User.objects.filter(username=username).exists():
+            username = f"{base_username}{counter}"
+            counter += 1
+
+        validated_data['username'] = username
+
         user = User.objects.create_user(
             password=password,
             **validated_data

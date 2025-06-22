@@ -44,7 +44,7 @@ const RegisterPage = () => {
     email: '',
     phone_number: '',
     password: '',
-    confirm_password: '',
+    password_confirm: '',
     role: 'patient', // Default to patient
   });
   const [showPassword, setShowPassword] = useState(false);
@@ -111,10 +111,10 @@ const RegisterPage = () => {
       errors.password = 'Password must contain at least one uppercase letter, one lowercase letter, and one number';
     }
 
-    if (!formData.confirm_password) {
-      errors.confirm_password = 'Please confirm your password';
-    } else if (formData.password !== formData.confirm_password) {
-      errors.confirm_password = 'Passwords do not match';
+    if (!formData.password_confirm) {
+      errors.password_confirm = 'Please confirm your password';
+    } else if (formData.password !== formData.password_confirm) {
+      errors.password_confirm = 'Passwords do not match';
     }
 
     if (!formData.role) {
@@ -137,8 +137,7 @@ const RegisterPage = () => {
     setFormErrors({}); // Clear any previous field errors
 
     try {
-      const { confirm_password, ...registrationData } = formData;
-      const result = await register(registrationData);
+      const result = await register(formData);
 
       if (result.success) {
         navigate('/dashboard', { replace: true });
@@ -337,14 +336,14 @@ const RegisterPage = () => {
 
         <TextField
           fullWidth
-          id="confirm_password"
-          name="confirm_password"
+          id="password_confirm"
+          name="password_confirm"
           label="Confirm Password"
           type={showConfirmPassword ? 'text' : 'password'}
-          value={formData.confirm_password}
+          value={formData.password_confirm}
           onChange={handleInputChange}
-          error={!!formErrors.confirm_password}
-          helperText={formErrors.confirm_password}
+          error={!!formErrors.password_confirm}
+          helperText={formErrors.password_confirm}
           margin="normal"
           required
           autoComplete="new-password"

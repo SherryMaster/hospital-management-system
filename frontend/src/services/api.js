@@ -150,12 +150,34 @@ export const handleApiError = (error) => {
         // Field-specific errors
         fieldErrors = data;
 
-        // Extract first error message for general display
-        const firstError = Object.values(data)[0];
-        if (Array.isArray(firstError)) {
-          message = firstError[0];
-        } else if (typeof firstError === 'string') {
-          message = firstError;
+        // Create a more descriptive error message based on field errors
+        const errorFields = Object.keys(data);
+        if (errorFields.length > 0) {
+          const fieldNames = errorFields.map(field => {
+            // Convert field names to user-friendly labels
+            const fieldLabels = {
+              'username': 'Username',
+              'email': 'Email',
+              'password': 'Password',
+              'password_confirm': 'Password confirmation',
+              'first_name': 'First name',
+              'last_name': 'Last name',
+              'phone_number': 'Phone number',
+              'role': 'Role'
+            };
+            return fieldLabels[field] || field.replace('_', ' ');
+          });
+
+          if (errorFields.length === 1) {
+            const firstError = Object.values(data)[0];
+            if (Array.isArray(firstError)) {
+              message = firstError[0];
+            } else if (typeof firstError === 'string') {
+              message = firstError;
+            }
+          } else {
+            message = `Please check the following fields: ${fieldNames.join(', ')}`;
+          }
         }
       } else {
         // General error message
@@ -230,6 +252,14 @@ export const authService = {
   register: async (userData) => {
     try {
       const response = await api.post('/auth/register/', userData);
+
+      // If registration includes tokens, store them
+      if (response.data.tokens) {
+        const { access, refresh } = response.data.tokens;
+        tokenManager.setToken(access);
+        tokenManager.setRefreshToken(refresh);
+      }
+
       return { data: response.data, error: null };
     } catch (error) {
       return { data: null, error: handleApiError(error) };
