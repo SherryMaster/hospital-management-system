@@ -107,6 +107,8 @@ export const endpoints = {
   patients: '/patients/',
   // Doctors
   doctors: '/doctors/',
+  // Departments
+  departments: '/departments/',
   // Appointments
   appointments: '/appointments/',
   // Billing
@@ -657,6 +659,54 @@ export const medicalRecordsService = {
     try {
       const response = await api.patch(`/patients/records/${recordId}/`, recordData);
       return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+};
+
+// Department Service
+export const departmentService = {
+  getDepartments: async (params = {}) => {
+    try {
+      const response = await api.get('/departments/', { params });
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  getDepartment: async (departmentId) => {
+    try {
+      const response = await api.get(`/departments/${departmentId}/`);
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  createDepartment: async (departmentData) => {
+    try {
+      const response = await api.post('/departments/', departmentData);
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  updateDepartment: async (departmentId, departmentData) => {
+    try {
+      const response = await api.patch(`/departments/${departmentId}/`, departmentData);
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  deleteDepartment: async (departmentId) => {
+    try {
+      await api.delete(`/departments/${departmentId}/`);
+      return { data: { message: 'Department deleted successfully' }, error: null };
     } catch (error) {
       return { data: null, error: handleApiError(error) };
     }

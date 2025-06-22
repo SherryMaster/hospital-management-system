@@ -42,10 +42,12 @@ import {
 } from '@mui/icons-material';
 import { MainLayout } from '../../components/layout';
 import { useAuth } from '../../contexts/AuthContext';
+import { patientService, appointmentService, billingService } from '../../services/api';
 
 const PatientDashboard = () => {
   const { user, logout } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [dashboardData, setDashboardData] = useState({
     upcomingAppointments: [],
     recentAppointments: [],
@@ -64,102 +66,107 @@ const PatientDashboard = () => {
 
   const loadDashboardData = async () => {
     setLoading(true);
+    setError(null);
+
     try {
-      // TODO: Replace with actual API calls
-      // Simulated data for now
-      setTimeout(() => {
-        setDashboardData({
-          upcomingAppointments: [
-            {
-              id: 1,
-              doctor: 'Dr. Smith',
-              department: 'Cardiology',
-              date: '2024-01-25',
-              time: '10:00 AM',
-              type: 'consultation',
-              status: 'confirmed',
-            },
-            {
-              id: 2,
-              doctor: 'Dr. Johnson',
-              department: 'General Medicine',
-              date: '2024-02-01',
-              time: '02:30 PM',
-              type: 'follow-up',
-              status: 'pending',
-            },
-          ],
-          recentAppointments: [
-            {
-              id: 3,
-              doctor: 'Dr. Wilson',
-              department: 'General Medicine',
-              date: '2024-01-15',
-              time: '09:00 AM',
-              type: 'check-up',
-              status: 'completed',
-              diagnosis: 'Regular checkup - All normal',
-            },
-            {
-              id: 4,
-              doctor: 'Dr. Brown',
-              department: 'Dermatology',
-              date: '2024-01-10',
-              time: '11:30 AM',
-              type: 'consultation',
-              status: 'completed',
-              diagnosis: 'Skin condition treated',
-            },
-          ],
-          medicalHistory: [
-            {
-              id: 1,
-              date: '2024-01-15',
-              type: 'Checkup',
-              doctor: 'Dr. Wilson',
-              notes: 'Regular health checkup - All vitals normal',
-            },
-            {
-              id: 2,
-              date: '2024-01-10',
-              type: 'Treatment',
-              doctor: 'Dr. Brown',
-              notes: 'Skin condition treatment completed',
-            },
-            {
-              id: 3,
-              date: '2023-12-20',
-              type: 'Lab Results',
-              doctor: 'Dr. Smith',
-              notes: 'Blood work results - All within normal range',
-            },
-          ],
-          pendingInvoices: [
-            {
-              id: 1,
-              date: '2024-01-15',
-              amount: 150.00,
-              description: 'Consultation Fee - Dr. Wilson',
-              dueDate: '2024-02-15',
-            },
-            {
-              id: 2,
-              date: '2024-01-10',
-              amount: 200.00,
-              description: 'Dermatology Treatment - Dr. Brown',
-              dueDate: '2024-02-10',
-            },
-          ],
-          healthSummary: {
-            bloodType: 'O+',
-            allergies: ['Penicillin', 'Shellfish'],
-            currentMedications: ['Vitamin D3', 'Multivitamin'],
-          },
-        });
-        setLoading(false);
-      }, 1000);
+      // Get current user's patient profile and related data
+      const [profileResult, upcomingAppointmentsResult, recentAppointmentsResult, invoicesResult] = await Promise.all([
+        patientService.getMyProfile(),
+        appointmentService.getAppointments({
+          status: 'confirmed,pending',
+          ordering: 'appointment_date',
+          page_size: 10
+        }),
+        appointmentService.getAppointments({
+          status: 'completed',
+          ordering: '-appointment_date',
+          page_size: 5
+        }),
+        billingService.getInvoices({
+          status: 'pending,overdue',
+          page_size: 10
+        })
+      ]);
+
+      const dashboardData = {
+        upcomingAppointments: [],
+        recentAppointments: [],
+        medicalHistory: [],
+        pendingInvoices: [],
+        healthSummary: {
+          bloodType: '',
+          allergies: [],
+          currentMedications: [],
+        }
+      };
+
+      // Process upcoming appointments
+      if (upcomingAppointmentsResult.data?.results) {
+        dashboardData.upcomingAppointments = upcomingAppointmentsResult.data.results
+          .filter(apt => new Date(apt.appointment_date) >= new Date())
+          .map(apt => ({
+            id: apt.id,
+            doctor: apt.doctor?.user?.full_name || apt.doctor?.full_name || 'Unknown Doctor',
+            department: apt.department?.name || apt.doctor?.department?.name || 'Unknown Department',
+            date: apt.appointment_date,
+            time: apt.appointment_time,
+            type: apt.appointment_type || 'consultation',
+            status: apt.status,
+            notes: apt.notes
+          }));
+      }
+
+      // Process recent appointments
+      if (recentAppointmentsResult.data?.results) {
+        dashboardData.recentAppointments = recentAppointmentsResult.data.results.map(apt => ({
+          id: apt.id,
+          doctor: apt.doctor?.user?.full_name || apt.doctor?.full_name || 'Unknown Doctor',
+          department: apt.department?.name || apt.doctor?.department?.name || 'Unknown Department',
+          date: apt.appointment_date,
+          time: apt.appointment_time,
+          type: apt.appointment_type || 'consultation',
+          status: apt.status,
+          diagnosis: apt.diagnosis || apt.notes || 'No diagnosis recorded'
+        }));
+
+        // Convert recent appointments to medical history format
+        dashboardData.medicalHistory = dashboardData.recentAppointments.map(apt => ({
+          id: apt.id,
+          date: apt.date,
+          type: apt.type === 'consultation' ? 'Consultation' :
+                apt.type === 'follow-up' ? 'Follow-up' :
+                apt.type === 'check-up' ? 'Checkup' : 'Visit',
+          doctor: apt.doctor,
+          notes: apt.diagnosis
+        }));
+      }
+
+      // Process pending invoices
+      if (invoicesResult.data?.results) {
+        dashboardData.pendingInvoices = invoicesResult.data.results.map(invoice => ({
+          id: invoice.id,
+          date: invoice.issue_date || invoice.created_at,
+          amount: parseFloat(invoice.total_amount || 0),
+          description: invoice.description || `Invoice #${invoice.invoice_number}`,
+          dueDate: invoice.due_date
+        }));
+      }
+
+      // Process patient profile for health summary
+      if (profileResult.data) {
+        const profile = profileResult.data;
+        dashboardData.healthSummary = {
+          bloodType: profile.blood_type || 'Not specified',
+          allergies: profile.allergies ? profile.allergies.split(',').map(a => a.trim()).filter(a => a) : [],
+          currentMedications: profile.current_medications ? profile.current_medications.split(',').map(m => m.trim()).filter(m => m) : []
+        };
+      }
+
+      setDashboardData(dashboardData);
     } catch (error) {
-      console.error('Error loading dashboard data:', error);
+      console.error('Failed to load dashboard data:', error);
+      setError('Failed to load dashboard data. Please try again.');
+    } finally {
       setLoading(false);
     }
   };
@@ -246,6 +253,16 @@ const PatientDashboard = () => {
             Manage your health appointments and medical records
           </Typography>
         </Box>
+
+        {/* Error Alert */}
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+            {error}
+            <Button size="small" onClick={loadDashboardData} sx={{ ml: 2 }}>
+              Retry
+            </Button>
+          </Alert>
+        )}
 
         {/* Quick Stats */}
         <Grid container spacing={3} sx={{ mb: 4 }}>

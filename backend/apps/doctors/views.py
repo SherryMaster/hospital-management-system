@@ -315,8 +315,15 @@ class MyDoctorProfileView(generics.RetrieveUpdateAPIView):
     def get_object(self):
         """Get current user's doctor profile"""
         if not hasattr(self.request.user, 'doctor_profile'):
-            # Create doctor profile if it doesn't exist
-            Doctor.objects.create(user=self.request.user)
+            # Create doctor profile if it doesn't exist with proper defaults
+            Doctor.objects.create(
+                user=self.request.user,
+                license_number=f"LIC{self.request.user.id:06d}",
+                employment_status=Doctor.EmploymentStatus.FULL_TIME,
+                consultation_fee=0.00,
+                years_of_experience=0,
+                is_accepting_patients=True,
+            )
         return self.request.user.doctor_profile
 
     def get_serializer_class(self):

@@ -67,8 +67,10 @@ const AppointmentsPage = () => {
   const [doctorFilter, setDoctorFilter] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [appointmentToCancel, setAppointmentToCancel] = useState(null);
+  const [appointmentToEdit, setAppointmentToEdit] = useState(null);
   const [formData, setFormData] = useState({
     patient: '',
     doctor: '',
@@ -111,6 +113,20 @@ const AppointmentsPage = () => {
     setCreateDialogOpen(true);
   };
 
+  const handleEditClick = (appointment) => {
+    setAppointmentToEdit(appointment);
+    setFormData({
+      patient: appointment.patient?.id || '',
+      doctor: appointment.doctor?.id || '',
+      appointment_date: appointment.appointment_date || '',
+      appointment_time: appointment.appointment_time || '',
+      appointment_type: appointment.appointment_type || 'consultation',
+      chief_complaint: appointment.chief_complaint || '',
+      notes: appointment.notes || '',
+    });
+    setEditDialogOpen(true);
+  };
+
   const handleCancelClick = (appointment) => {
     setAppointmentToCancel(appointment);
     setCancelDialogOpen(true);
@@ -128,10 +144,21 @@ const AppointmentsPage = () => {
   };
 
   const handleFormSubmit = async () => {
-    const result = await createAppointment(formData);
-    if (result.data) {
-      loadAppointments();
-      setCreateDialogOpen(false);
+    if (appointmentToEdit) {
+      // Update existing appointment
+      const result = await updateAppointment(appointmentToEdit.id, formData);
+      if (result.data) {
+        loadAppointments();
+        setEditDialogOpen(false);
+        setAppointmentToEdit(null);
+      }
+    } else {
+      // Create new appointment
+      const result = await createAppointment(formData);
+      if (result.data) {
+        loadAppointments();
+        setCreateDialogOpen(false);
+      }
     }
   };
 
@@ -366,7 +393,7 @@ const AppointmentsPage = () => {
                         <TableCell align="right">
                           <IconButton
                             size="small"
-                            onClick={() => {/* TODO: Open edit dialog */}}
+                            onClick={() => handleEditClick(appointment)}
                           >
                             <EditIcon />
                           </IconButton>
@@ -511,6 +538,129 @@ const AppointmentsPage = () => {
               disabled={loading}
             >
               Book Appointment
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Edit Appointment Dialog */}
+        <Dialog
+          open={editDialogOpen}
+          onClose={() => {
+            setEditDialogOpen(false);
+            setAppointmentToEdit(null);
+          }}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle>Edit Appointment</DialogTitle>
+          <DialogContent>
+            <Box sx={{ pt: 2 }}>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    select
+                    label="Patient"
+                    value={formData.patient}
+                    onChange={(e) => handleFormChange('patient', e.target.value)}
+                    required
+                  >
+                    {patients.map((patient) => (
+                      <MenuItem key={patient.id} value={patient.id}>
+                        {patient.user?.full_name} ({patient.patient_id})
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    select
+                    label="Doctor"
+                    value={formData.doctor}
+                    onChange={(e) => handleFormChange('doctor', e.target.value)}
+                    required
+                  >
+                    {doctors.map((doctor) => (
+                      <MenuItem key={doctor.id} value={doctor.id}>
+                        Dr. {doctor.user?.full_name} - {doctor.department_name}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    type="date"
+                    label="Appointment Date"
+                    value={formData.appointment_date}
+                    onChange={(e) => handleFormChange('appointment_date', e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    required
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    type="time"
+                    label="Appointment Time"
+                    value={formData.appointment_time}
+                    onChange={(e) => handleFormChange('appointment_time', e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    required
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    select
+                    label="Appointment Type"
+                    value={formData.appointment_type}
+                    onChange={(e) => handleFormChange('appointment_type', e.target.value)}
+                    required
+                  >
+                    <MenuItem value="consultation">Consultation</MenuItem>
+                    <MenuItem value="follow-up">Follow-up</MenuItem>
+                    <MenuItem value="check-up">Check-up</MenuItem>
+                    <MenuItem value="emergency">Emergency</MenuItem>
+                  </TextField>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Chief Complaint"
+                    value={formData.chief_complaint}
+                    onChange={(e) => handleFormChange('chief_complaint', e.target.value)}
+                    placeholder="Brief description of the issue"
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    multiline
+                    rows={3}
+                    label="Notes"
+                    value={formData.notes}
+                    onChange={(e) => handleFormChange('notes', e.target.value)}
+                    placeholder="Additional notes or instructions"
+                  />
+                </Grid>
+              </Grid>
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => {
+              setEditDialogOpen(false);
+              setAppointmentToEdit(null);
+            }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleFormSubmit}
+              variant="contained"
+              disabled={loading}
+            >
+              Update Appointment
             </Button>
           </DialogActions>
         </Dialog>

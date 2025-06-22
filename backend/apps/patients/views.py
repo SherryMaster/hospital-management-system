@@ -151,8 +151,12 @@ class MyPatientProfileView(generics.RetrieveUpdateAPIView):
     def get_object(self):
         """Get current user's patient profile"""
         if not hasattr(self.request.user, 'patient_profile'):
-            # Create patient profile if it doesn't exist
-            Patient.objects.create(user=self.request.user)
+            # Create patient profile if it doesn't exist with proper defaults
+            Patient.objects.create(
+                user=self.request.user,
+                blood_type=Patient.BloodType.UNKNOWN,
+                marital_status=Patient.MaritalStatus.SINGLE,
+            )
         return self.request.user.patient_profile
 
     def get_serializer_class(self):

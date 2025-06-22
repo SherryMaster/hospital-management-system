@@ -87,14 +87,66 @@ const DoctorDashboard = () => {
       page_size: 5,
       ordering: '-last_visit_date',
     });
-
-    // Mock notifications for now
-    setNotifications([
-      { id: 1, message: 'New appointment request pending approval', time: '10 min ago', type: 'appointment' },
-      { id: 2, message: 'Lab results available for review', time: '1 hour ago', type: 'lab' },
-      { id: 3, message: 'Prescription refill request', time: '2 hours ago', type: 'prescription' },
-    ]);
   }, [user, fetchAppointments, fetchPatients]);
+
+  // Generate notifications based on real data
+  useEffect(() => {
+    const generateNotifications = () => {
+      const newNotifications = [];
+
+      // Check for pending appointments
+      const pendingAppointments = appointments?.filter(apt => apt.status === 'pending') || [];
+      if (pendingAppointments.length > 0) {
+        newNotifications.push({
+          id: 'pending-appointments',
+          message: `${pendingAppointments.length} appointment${pendingAppointments.length > 1 ? 's' : ''} pending approval`,
+          time: 'Now',
+          type: 'appointment'
+        });
+      }
+
+      // Check for upcoming appointments in next hour
+      const now = new Date();
+      const nextHour = new Date(now.getTime() + 60 * 60 * 1000);
+      const upcomingAppointments = appointments?.filter(apt => {
+        if (apt.status !== 'confirmed') return false;
+        const aptDateTime = new Date(`${apt.appointment_date}T${apt.appointment_time}`);
+        return aptDateTime >= now && aptDateTime <= nextHour;
+      }) || [];
+
+      if (upcomingAppointments.length > 0) {
+        newNotifications.push({
+          id: 'upcoming-appointments',
+          message: `${upcomingAppointments.length} appointment${upcomingAppointments.length > 1 ? 's' : ''} in the next hour`,
+          time: 'Now',
+          type: 'reminder'
+        });
+      }
+
+      // Check for patients with recent visits (potential follow-ups needed)
+      const recentPatients = patients?.filter(patient => {
+        if (!patient.last_visit_date) return false;
+        const lastVisit = new Date(patient.last_visit_date);
+        const daysSinceVisit = (now - lastVisit) / (1000 * 60 * 60 * 24);
+        return daysSinceVisit >= 7 && daysSinceVisit <= 14; // 1-2 weeks ago
+      }) || [];
+
+      if (recentPatients.length > 0) {
+        newNotifications.push({
+          id: 'follow-up-needed',
+          message: `${recentPatients.length} patient${recentPatients.length > 1 ? 's' : ''} may need follow-up`,
+          time: 'Today',
+          type: 'follow-up'
+        });
+      }
+
+      setNotifications(newNotifications.slice(0, 5)); // Limit to 5 notifications
+    };
+
+    if (appointments || patients) {
+      generateNotifications();
+    }
+  }, [appointments, patients]);
 
   const loading = dashboardLoading || appointmentsLoading || patientsLoading;
   const error = dashboardError || appointmentsError || patientsError;

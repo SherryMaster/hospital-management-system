@@ -48,12 +48,12 @@ import {
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { MainLayout } from '../../components/layout';
 import { useAuth } from '../../contexts/AuthContext';
-// import { useAppointments } from '../../hooks/useApi';
-// import { doctorService, appointmentService } from '../../services/api';
+import { useAppointments } from '../../hooks/useApi';
+import { doctorService, appointmentService, departmentService } from '../../services/api';
 
 const AppointmentBooking = () => {
   const { user, logout } = useAuth();
-  // const { createAppointment } = useAppointments();
+  const { createAppointment } = useAppointments();
   const [activeStep, setActiveStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -92,8 +92,34 @@ const AppointmentBooking = () => {
 
   const loadDepartments = async () => {
     try {
-      // TODO: Replace with actual API call
-      // Simulated data for now
+      // Try to fetch real departments from API
+      const result = await departmentService.getDepartments();
+
+      if (result.data?.results) {
+        setAvailableData(prev => ({
+          ...prev,
+          departments: result.data.results.map(dept => ({
+            id: dept.id,
+            name: dept.name,
+            description: dept.description || `${dept.name} department`
+          }))
+        }));
+      } else {
+        // Fallback to simulated data if API fails
+        setAvailableData(prev => ({
+          ...prev,
+          departments: [
+            { id: 1, name: 'Cardiology', description: 'Heart and cardiovascular care' },
+            { id: 2, name: 'General Medicine', description: 'Primary healthcare services' },
+            { id: 3, name: 'Dermatology', description: 'Skin and hair care' },
+            { id: 4, name: 'Orthopedics', description: 'Bone and joint care' },
+            { id: 5, name: 'Pediatrics', description: 'Children healthcare' },
+          ],
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading departments:', error);
+      // Fallback to simulated data on error
       setAvailableData(prev => ({
         ...prev,
         departments: [
@@ -104,91 +130,124 @@ const AppointmentBooking = () => {
           { id: 5, name: 'Pediatrics', description: 'Children healthcare' },
         ],
       }));
-    } catch (error) {
-      console.error('Error loading departments:', error);
     }
   };
 
   const loadDoctorsByDepartment = async (departmentId) => {
     try {
-      // TODO: Replace with actual API call
-      // const { data, error } = await doctorService.getDoctors({ department: departmentId });
+      // Try to fetch real doctors from API
+      const result = await doctorService.getDoctors({ department: departmentId });
 
-      // if (error) {
-      //   console.error('Error loading doctors:', error);
+      if (result.data?.results) {
+        // Use API data
+        setAvailableData(prev => ({
+          ...prev,
+          doctors: result.data.results.map(doctor => ({
+            id: doctor.id,
+            name: doctor.user?.full_name || doctor.full_name || 'Unknown Doctor',
+            specialization: doctor.specializations?.[0]?.name || doctor.department?.name || 'General Medicine',
+            experience: doctor.years_of_experience ? `${doctor.years_of_experience} years` : 'Experience not specified',
+            rating: doctor.rating || 4.5,
+            fee: doctor.consultation_fee || 150
+          }))
+        }));
+      } else {
         // Fallback to simulated data
         const doctorsByDepartment = {
-        1: [ // Cardiology
-          { id: 1, name: 'Dr. John Smith', specialization: 'Cardiologist', experience: '15 years', rating: 4.8, fee: 200 },
-          { id: 2, name: 'Dr. Sarah Johnson', specialization: 'Cardiac Surgeon', experience: '12 years', rating: 4.9, fee: 250 },
-        ],
-        2: [ // General Medicine
-          { id: 3, name: 'Dr. Michael Brown', specialization: 'General Physician', experience: '10 years', rating: 4.7, fee: 150 },
-          { id: 4, name: 'Dr. Emily Davis', specialization: 'Family Medicine', experience: '8 years', rating: 4.6, fee: 140 },
-        ],
-        3: [ // Dermatology
-          { id: 5, name: 'Dr. Robert Wilson', specialization: 'Dermatologist', experience: '14 years', rating: 4.8, fee: 180 },
-        ],
-        4: [ // Orthopedics
-          { id: 6, name: 'Dr. Lisa Anderson', specialization: 'Orthopedic Surgeon', experience: '16 years', rating: 4.9, fee: 220 },
-        ],
-        5: [ // Pediatrics
-          { id: 7, name: 'Dr. David Miller', specialization: 'Pediatrician', experience: '11 years', rating: 4.7, fee: 160 },
-        ],
-      };
+          1: [ // Cardiology
+            { id: 1, name: 'Dr. John Smith', specialization: 'Cardiologist', experience: '15 years', rating: 4.8, fee: 200 },
+            { id: 2, name: 'Dr. Sarah Johnson', specialization: 'Cardiac Surgeon', experience: '12 years', rating: 4.9, fee: 250 },
+          ],
+          2: [ // General Medicine
+            { id: 3, name: 'Dr. Michael Brown', specialization: 'General Physician', experience: '10 years', rating: 4.7, fee: 150 },
+            { id: 4, name: 'Dr. Emily Davis', specialization: 'Family Medicine', experience: '8 years', rating: 4.6, fee: 140 },
+          ],
+          3: [ // Dermatology
+            { id: 5, name: 'Dr. Robert Wilson', specialization: 'Dermatologist', experience: '14 years', rating: 4.8, fee: 180 },
+          ],
+          4: [ // Orthopedics
+            { id: 6, name: 'Dr. Lisa Anderson', specialization: 'Orthopedic Surgeon', experience: '16 years', rating: 4.9, fee: 220 },
+          ],
+          5: [ // Pediatrics
+            { id: 7, name: 'Dr. David Miller', specialization: 'Pediatrician', experience: '11 years', rating: 4.7, fee: 160 },
+          ],
+        };
 
         setAvailableData(prev => ({
           ...prev,
           doctors: doctorsByDepartment[departmentId] || [],
         }));
-      // } else {
-      //   // Use API data
-      //   setAvailableData(prev => ({
-      //     ...prev,
-      //     doctors: data.results || data,
-      //   }));
-      // }
+      }
     } catch (error) {
       console.error('Error loading doctors:', error);
+      // Fallback to simulated data on error
+      const doctorsByDepartment = {
+        1: [{ id: 1, name: 'Dr. John Smith', specialization: 'Cardiologist', experience: '15 years', rating: 4.8, fee: 200 }],
+        2: [{ id: 3, name: 'Dr. Michael Brown', specialization: 'General Physician', experience: '10 years', rating: 4.7, fee: 150 }],
+        3: [{ id: 5, name: 'Dr. Robert Wilson', specialization: 'Dermatologist', experience: '14 years', rating: 4.8, fee: 180 }],
+        4: [{ id: 6, name: 'Dr. Lisa Anderson', specialization: 'Orthopedic Surgeon', experience: '16 years', rating: 4.9, fee: 220 }],
+        5: [{ id: 7, name: 'Dr. David Miller', specialization: 'Pediatrician', experience: '11 years', rating: 4.7, fee: 160 }],
+      };
+      setAvailableData(prev => ({
+        ...prev,
+        doctors: doctorsByDepartment[departmentId] || [],
+      }));
     }
   };
 
   const loadAvailableTimeSlots = async (doctorId, date) => {
     try {
-      // TODO: Replace with actual API call
-      // const { data, error } = await appointmentService.getAvailableSlots(doctorId, date.toISOString().split('T')[0]);
+      // Try to fetch real available slots from API
+      const result = await appointmentService.getAvailableSlots(doctorId, date.toISOString().split('T')[0]);
 
-      // if (error) {
-      //   console.error('Error loading time slots:', error);
+      if (result.data?.results || result.data) {
+        // Use API data
+        const slots = result.data.results || result.data;
+        setAvailableData(prev => ({
+          ...prev,
+          timeSlots: slots.map((slot, index) => ({
+            id: slot.id || index + 1,
+            time: slot.time || slot.appointment_time,
+            available: slot.available !== false
+          }))
+        }));
+      } else {
         // Fallback to simulated data
         const timeSlots = [
-        { id: 1, time: '09:00 AM', available: true },
-        { id: 2, time: '09:30 AM', available: false },
-        { id: 3, time: '10:00 AM', available: true },
-        { id: 4, time: '10:30 AM', available: true },
-        { id: 5, time: '11:00 AM', available: false },
-        { id: 6, time: '11:30 AM', available: true },
-        { id: 7, time: '02:00 PM', available: true },
-        { id: 8, time: '02:30 PM', available: true },
-        { id: 9, time: '03:00 PM', available: false },
-        { id: 10, time: '03:30 PM', available: true },
-        { id: 11, time: '04:00 PM', available: true },
-        { id: 12, time: '04:30 PM', available: true },
-      ];
+          { id: 1, time: '09:00', available: true },
+          { id: 2, time: '09:30', available: false },
+          { id: 3, time: '10:00', available: true },
+          { id: 4, time: '10:30', available: true },
+          { id: 5, time: '11:00', available: false },
+          { id: 6, time: '11:30', available: true },
+          { id: 7, time: '14:00', available: true },
+          { id: 8, time: '14:30', available: true },
+          { id: 9, time: '15:00', available: false },
+          { id: 10, time: '15:30', available: true },
+          { id: 11, time: '16:00', available: true },
+          { id: 12, time: '16:30', available: true },
+        ];
 
         setAvailableData(prev => ({
           ...prev,
           timeSlots: timeSlots,
         }));
-      // } else {
-      //   // Use API data
-      //   setAvailableData(prev => ({
-      //     ...prev,
-      //     timeSlots: data.results || data,
-      //   }));
-      // }
+      }
     } catch (error) {
       console.error('Error loading time slots:', error);
+      // Fallback to simulated data on error
+      const timeSlots = [
+        { id: 1, time: '09:00', available: true },
+        { id: 2, time: '10:00', available: true },
+        { id: 3, time: '11:00', available: true },
+        { id: 4, time: '14:00', available: true },
+        { id: 5, time: '15:00', available: true },
+        { id: 6, time: '16:00', available: true },
+      ];
+      setAvailableData(prev => ({
+        ...prev,
+        timeSlots: timeSlots,
+      }));
     }
   };
 
@@ -263,18 +322,44 @@ const AppointmentBooking = () => {
 
     setLoading(true);
     try {
-      // TODO: Replace with actual API call
-      console.log('Booking appointment:', formData);
+      // Prepare appointment data for API
+      const selectedTimeSlot = getSelectedTimeSlot();
+      const appointmentData = {
+        patient: user?.patient_profile?.id || user?.id,
+        doctor: formData.doctor,
+        department: formData.department,
+        appointment_date: formData.appointmentDate.toISOString().split('T')[0],
+        appointment_time: selectedTimeSlot?.time || formData.timeSlot,
+        appointment_type: formData.appointmentType,
+        chief_complaint: formData.chiefComplaint,
+        notes: formData.notes,
+        status: 'pending'
+      };
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Create appointment via API
+      const result = await createAppointment(appointmentData);
+
+      if (result.error) {
+        throw new Error(result.error.message || 'Failed to book appointment');
+      }
 
       // Show success and redirect
       alert('Appointment booked successfully!');
+      // Reset form
+      setFormData({
+        department: '',
+        doctor: '',
+        appointmentDate: null,
+        timeSlot: '',
+        appointmentType: 'consultation',
+        chiefComplaint: '',
+        notes: '',
+      });
+      setActiveStep(0);
       // navigate('/appointments');
     } catch (error) {
       console.error('Error booking appointment:', error);
-      alert('Error booking appointment. Please try again.');
+      alert(error.message || 'Error booking appointment. Please try again.');
     } finally {
       setLoading(false);
     }

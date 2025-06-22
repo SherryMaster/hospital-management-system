@@ -3,6 +3,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from phonenumber_field.serializerfields import PhoneNumberField
 from .models import User
 
 
@@ -108,7 +109,8 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         write_only=True,
         style={'input_type': 'password'}
     )
-    
+    phone_number = PhoneNumberField(required=False)
+
     class Meta:
         model = User
         fields = [
@@ -172,7 +174,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
     full_name = serializers.ReadOnlyField(source='get_full_name')
     initials = serializers.ReadOnlyField(source='get_initials')
     full_address = serializers.ReadOnlyField(source='get_full_address')
-    
+    phone_number = PhoneNumberField(read_only=True)
+    emergency_contact_phone = PhoneNumberField(read_only=True)
+
     class Meta:
         model = User
         fields = [
@@ -194,7 +198,9 @@ class UserUpdateSerializer(serializers.ModelSerializer):
     """
     Serializer for updating user profile
     """
-    
+    phone_number = PhoneNumberField(required=False)
+    emergency_contact_phone = PhoneNumberField(required=False)
+
     class Meta:
         model = User
         fields = [
@@ -269,7 +275,8 @@ class UserCreateSerializer(serializers.ModelSerializer):
         validators=[validate_password],
         style={'input_type': 'password'}
     )
-    
+    phone_number = PhoneNumberField(required=False)
+
     class Meta:
         model = User
         fields = [

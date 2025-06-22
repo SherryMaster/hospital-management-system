@@ -34,7 +34,7 @@ import {
 import { MainLayout } from '../components/layout';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
-import api from '../services/api';
+import { patientService, doctorService, appointmentService, billingService } from '../services/api';
 
 const AnalyticsPage = () => {
   const { user, logout } = useAuth();
@@ -74,69 +74,125 @@ const AnalyticsPage = () => {
       setLoading(true);
       setError(null);
 
-      // For now, we'll use mock data since the analytics endpoints might not be implemented yet
-      // TODO: Replace with actual API calls when analytics endpoints are available
-      const mockData = {
+      // Fetch real data from multiple API endpoints
+      const [patientsResult, doctorsResult, appointmentsResult, billingResult] = await Promise.all([
+        patientService.getPatients({ page_size: 1000 }),
+        doctorService.getDoctors({ page_size: 1000 }),
+        appointmentService.getAppointments({ page_size: 1000 }),
+        billingService.getInvoices({ page_size: 1000 })
+      ]);
+
+      // Process the data
+      const patients = patientsResult.data?.results || [];
+      const doctors = doctorsResult.data?.results || [];
+      const appointments = appointmentsResult.data?.results || [];
+      const invoices = billingResult.data?.results || [];
+
+      // Calculate overview statistics
+      const totalRevenue = invoices.reduce((sum, invoice) => sum + parseFloat(invoice.total_amount || 0), 0);
+
+      // Calculate monthly growth (simplified - comparing current month to previous)
+      const currentMonth = new Date().getMonth();
+      const currentMonthPatients = patients.filter(p => new Date(p.created_at).getMonth() === currentMonth).length;
+      const previousMonthPatients = patients.filter(p => new Date(p.created_at).getMonth() === currentMonth - 1).length;
+      const monthlyGrowth = previousMonthPatients > 0 ? ((currentMonthPatients - previousMonthPatients) / previousMonthPatients * 100) : 0;
+
+      // Generate trends data (last 6 months)
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const currentMonthIndex = new Date().getMonth();
+      const last6Months = [];
+      for (let i = 5; i >= 0; i--) {
+        const monthIndex = (currentMonthIndex - i + 12) % 12;
+        last6Months.push(months[monthIndex]);
+      }
+
+      const patientRegistrations = last6Months.map(month => {
+        const monthIndex = months.indexOf(month);
+        const count = patients.filter(p => new Date(p.created_at).getMonth() === monthIndex).length;
+        return { month, count };
+      });
+
+      const appointmentBookings = last6Months.map(month => {
+        const monthIndex = months.indexOf(month);
+        const count = appointments.filter(a => new Date(a.appointment_date).getMonth() === monthIndex).length;
+        return { month, count };
+      });
+
+      const revenueData = last6Months.map(month => {
+        const monthIndex = months.indexOf(month);
+        const amount = invoices
+          .filter(i => new Date(i.issue_date || i.created_at).getMonth() === monthIndex)
+          .reduce((sum, invoice) => sum + parseFloat(invoice.total_amount || 0), 0);
+        return { month, amount };
+      });
+
+      // Calculate demographics
+      const ageGroups = [
+        { group: '0-18', count: 0 },
+        { group: '19-35', count: 0 },
+        { group: '36-50', count: 0 },
+        { group: '51-65', count: 0 },
+        { group: '65+', count: 0 },
+      ];
+
+      patients.forEach(patient => {
+        if (patient.date_of_birth) {
+          const age = new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear();
+          if (age <= 18) ageGroups[0].count++;
+          else if (age <= 35) ageGroups[1].count++;
+          else if (age <= 50) ageGroups[2].count++;
+          else if (age <= 65) ageGroups[3].count++;
+          else ageGroups[4].count++;
+        }
+      });
+
+      const genderDistribution = [
+        { gender: 'Male', count: patients.filter(p => p.gender === 'M' || p.gender === 'male').length },
+        { gender: 'Female', count: patients.filter(p => p.gender === 'F' || p.gender === 'female').length },
+        { gender: 'Other', count: patients.filter(p => p.gender && !['M', 'F', 'male', 'female'].includes(p.gender)).length },
+      ];
+
+      // Department statistics
+      const departmentStats = {};
+      appointments.forEach(appointment => {
+        const deptName = appointment.department?.name || appointment.doctor?.department?.name || 'Unknown';
+        if (!departmentStats[deptName]) {
+          departmentStats[deptName] = new Set();
+        }
+        if (appointment.patient?.id) {
+          departmentStats[deptName].add(appointment.patient.id);
+        }
+      });
+
+      const departmentStatsArray = Object.entries(departmentStats).map(([department, patientSet]) => ({
+        department,
+        patients: patientSet.size
+      }));
+
+      const analyticsData = {
         overview: {
-          totalPatients: 1250,
-          totalDoctors: 45,
-          totalAppointments: 3420,
-          totalRevenue: 125000,
-          monthlyGrowth: 12.5,
+          totalPatients: patients.length,
+          totalDoctors: doctors.length,
+          totalAppointments: appointments.length,
+          totalRevenue: Math.round(totalRevenue),
+          monthlyGrowth: Math.round(monthlyGrowth * 10) / 10,
         },
         trends: {
-          patientRegistrations: [
-            { month: 'Jan', count: 120 },
-            { month: 'Feb', count: 135 },
-            { month: 'Mar', count: 150 },
-            { month: 'Apr', count: 142 },
-            { month: 'May', count: 168 },
-            { month: 'Jun', count: 180 },
-          ],
-          appointmentBookings: [
-            { month: 'Jan', count: 450 },
-            { month: 'Feb', count: 520 },
-            { month: 'Mar', count: 580 },
-            { month: 'Apr', count: 610 },
-            { month: 'May', count: 650 },
-            { month: 'Jun', count: 720 },
-          ],
-          revenueData: [
-            { month: 'Jan', amount: 18000 },
-            { month: 'Feb', amount: 20500 },
-            { month: 'Mar', amount: 22000 },
-            { month: 'Apr', amount: 21500 },
-            { month: 'May', amount: 24000 },
-            { month: 'Jun', amount: 26500 },
-          ],
+          patientRegistrations,
+          appointmentBookings,
+          revenueData,
         },
         demographics: {
-          ageGroups: [
-            { group: '0-18', count: 180 },
-            { group: '19-35', count: 420 },
-            { group: '36-50', count: 380 },
-            { group: '51-65', count: 200 },
-            { group: '65+', count: 70 },
-          ],
-          genderDistribution: [
-            { gender: 'Male', count: 580 },
-            { gender: 'Female', count: 620 },
-            { gender: 'Other', count: 50 },
-          ],
-          departmentStats: [
-            { department: 'Cardiology', patients: 220 },
-            { department: 'Neurology', patients: 180 },
-            { department: 'Orthopedics', patients: 250 },
-            { department: 'Pediatrics', patients: 200 },
-            { department: 'General Medicine', patients: 400 },
-          ],
+          ageGroups,
+          genderDistribution,
+          departmentStats: departmentStatsArray,
         },
       };
 
-      setAnalyticsData(mockData);
+      setAnalyticsData(analyticsData);
     } catch (err) {
       console.error('Error fetching analytics data:', err);
-      setError('Failed to load analytics data. Please try again.');
+      setError(err.message || 'Failed to load analytics data. Please try again.');
       showNotification('Failed to load analytics data', 'error');
     } finally {
       setLoading(false);

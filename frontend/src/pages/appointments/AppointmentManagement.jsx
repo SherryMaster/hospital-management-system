@@ -51,6 +51,7 @@ import {
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { MainLayout } from '../../components/layout';
 import { useAuth } from '../../contexts/AuthContext';
+import { appointmentService } from '../../services/api';
 
 const AppointmentManagement = () => {
   const { user, logout } = useAuth();
@@ -83,82 +84,30 @@ const AppointmentManagement = () => {
   const loadAppointments = async () => {
     setLoading(true);
     try {
-      // TODO: Replace with actual API call
-      // Simulated data for now
-      const mockAppointments = [
-        {
-          id: 1,
-          patient: 'John Doe',
-          patientEmail: 'john@example.com',
-          doctor: 'Dr. Smith',
-          date: '2024-01-25',
-          time: '09:00 AM',
-          duration: 30,
-          type: 'consultation',
-          status: 'confirmed',
-          department: 'Cardiology',
-          chiefComplaint: 'Chest pain and shortness of breath',
-          notes: 'Patient reports symptoms for 2 weeks',
-        },
-        {
-          id: 2,
-          patient: 'Jane Wilson',
-          patientEmail: 'jane@example.com',
-          doctor: 'Dr. Johnson',
-          date: '2024-01-25',
-          time: '10:30 AM',
-          duration: 45,
-          type: 'follow-up',
-          status: 'pending',
-          department: 'General Medicine',
-          chiefComplaint: 'Follow-up for diabetes management',
-          notes: 'Regular check-up appointment',
-        },
-        {
-          id: 3,
-          patient: 'Mike Brown',
-          patientEmail: 'mike@example.com',
-          doctor: 'Dr. Davis',
-          date: '2024-01-26',
-          time: '02:00 PM',
-          duration: 30,
-          type: 'check-up',
-          status: 'confirmed',
-          department: 'Dermatology',
-          chiefComplaint: 'Skin rash examination',
-          notes: 'Annual skin check',
-        },
-        {
-          id: 4,
-          patient: 'Sarah Miller',
-          patientEmail: 'sarah@example.com',
-          doctor: 'Dr. Wilson',
-          date: '2024-01-24',
-          time: '03:30 PM',
-          duration: 60,
-          type: 'consultation',
-          status: 'completed',
-          department: 'Orthopedics',
-          chiefComplaint: 'Knee pain after injury',
-          notes: 'Sports injury consultation',
-        },
-        {
-          id: 5,
-          patient: 'David Anderson',
-          patientEmail: 'david@example.com',
-          doctor: 'Dr. Taylor',
-          date: '2024-01-23',
-          time: '11:00 AM',
-          duration: 30,
-          type: 'emergency',
-          status: 'cancelled',
-          department: 'Emergency',
-          chiefComplaint: 'Emergency consultation',
-          notes: 'Patient cancelled due to improvement',
-        },
-      ];
+      // Fetch real appointments from API
+      const result = await appointmentService.getAppointments({ page_size: 100 });
 
-      setAppointments(mockAppointments);
+      if (result.error) {
+        throw new Error(result.error.message || 'Failed to fetch appointments');
+      }
+
+      // Process appointments data
+      const processedAppointments = (result.data?.results || []).map(appointment => ({
+        id: appointment.id,
+        patient: appointment.patient?.user?.full_name || appointment.patient?.full_name || 'Unknown Patient',
+        patientEmail: appointment.patient?.user?.email || appointment.patient?.email || 'No email',
+        doctor: appointment.doctor?.user?.full_name || appointment.doctor?.full_name || 'Unknown Doctor',
+        date: appointment.appointment_date,
+        time: appointment.appointment_time,
+        duration: appointment.duration || 30,
+        type: appointment.appointment_type || 'consultation',
+        status: appointment.status || 'pending',
+        department: appointment.department?.name || appointment.doctor?.department?.name || 'Unknown Department',
+        chiefComplaint: appointment.chief_complaint || 'No complaint specified',
+        notes: appointment.notes || 'No notes'
+      }));
+
+      setAppointments(processedAppointments);
     } catch (error) {
       console.error('Error loading appointments:', error);
     } finally {
@@ -236,15 +185,20 @@ const AppointmentManagement = () => {
 
   const handleStatusUpdate = async (appointmentId, newStatus) => {
     try {
-      // TODO: Replace with actual API call
-      console.log('Updating appointment status:', appointmentId, newStatus);
-      
+      // Update appointment status via API
+      const result = await appointmentService.updateAppointment(appointmentId, { status: newStatus });
+
+      if (result.error) {
+        throw new Error(result.error.message || 'Failed to update appointment status');
+      }
+
+      // Update local state
       setAppointments(prev =>
         prev.map(apt =>
           apt.id === appointmentId ? { ...apt, status: newStatus } : apt
         )
       );
-      
+
       handleActionMenuClose();
     } catch (error) {
       console.error('Error updating appointment status:', error);
@@ -253,9 +207,21 @@ const AppointmentManagement = () => {
 
   const handleReschedule = async () => {
     try {
-      // TODO: Replace with actual API call
-      console.log('Rescheduling appointment:', selectedAppointment.id, rescheduleData);
-      
+      // Reschedule appointment via API
+      const updateData = {
+        appointment_date: rescheduleData.date?.toISOString().split('T')[0],
+        appointment_time: rescheduleData.timeSlot,
+        status: 'pending', // Reset to pending after reschedule
+        notes: rescheduleData.reason ? `Rescheduled: ${rescheduleData.reason}` : undefined
+      };
+
+      const result = await appointmentService.updateAppointment(selectedAppointment.id, updateData);
+
+      if (result.error) {
+        throw new Error(result.error.message || 'Failed to reschedule appointment');
+      }
+
+      // Update local state
       setAppointments(prev =>
         prev.map(apt =>
           apt.id === selectedAppointment.id
@@ -263,12 +229,12 @@ const AppointmentManagement = () => {
                 ...apt,
                 date: rescheduleData.date?.toISOString().split('T')[0],
                 time: rescheduleData.timeSlot,
-                status: 'pending', // Reset to pending after reschedule
+                status: 'pending',
               }
             : apt
         )
       );
-      
+
       handleDialogClose();
     } catch (error) {
       console.error('Error rescheduling appointment:', error);
@@ -277,9 +243,19 @@ const AppointmentManagement = () => {
 
   const handleCancel = async () => {
     try {
-      // TODO: Replace with actual API call
-      console.log('Cancelling appointment:', selectedAppointment.id, rescheduleData.reason);
-      
+      // Cancel appointment via API
+      const updateData = {
+        status: 'cancelled',
+        notes: rescheduleData.reason ? `Cancelled: ${rescheduleData.reason}` : 'Cancelled'
+      };
+
+      const result = await appointmentService.updateAppointment(selectedAppointment.id, updateData);
+
+      if (result.error) {
+        throw new Error(result.error.message || 'Failed to cancel appointment');
+      }
+
+      // Update local state
       setAppointments(prev =>
         prev.map(apt =>
           apt.id === selectedAppointment.id
@@ -287,7 +263,7 @@ const AppointmentManagement = () => {
             : apt
         )
       );
-      
+
       handleDialogClose();
     } catch (error) {
       console.error('Error cancelling appointment:', error);

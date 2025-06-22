@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from phonenumber_field.serializerfields import PhoneNumberField
 from .models import Patient, MedicalRecord
 from apps.accounts.serializers import UserProfileSerializer
 
@@ -88,7 +89,7 @@ class PatientListSerializer(serializers.ModelSerializer):
     full_name = serializers.ReadOnlyField(source='get_full_name')
     age = serializers.ReadOnlyField()
     email = serializers.ReadOnlyField(source='user.email')
-    phone = serializers.ReadOnlyField(source='user.phone_number')
+    phone = PhoneNumberField(source='user.phone_number', read_only=True)
     
     class Meta:
         model = Patient

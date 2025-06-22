@@ -46,26 +46,41 @@ def dashboard_stats(request):
 def _get_admin_stats(request):
     """Get comprehensive statistics for admin users."""
     today = date.today()
-    
-    # User statistics
+
+    # User statistics - count actual profiles, not just user roles
     total_users = User.objects.count()
-    total_patients = User.objects.filter(role='patient').count()
-    total_doctors = User.objects.filter(role='doctor').count()
-    
+    total_patients = Patient.objects.filter(is_active=True).count()
+    total_doctors = Doctor.objects.filter(is_active=True).count()
+
+    # Additional user role statistics for reference
+    patient_users_without_profiles = User.objects.filter(
+        role='patient'
+    ).exclude(
+        id__in=Patient.objects.values_list('user_id', flat=True)
+    ).count()
+
+    doctor_users_without_profiles = User.objects.filter(
+        role='doctor'
+    ).exclude(
+        id__in=Doctor.objects.values_list('user_id', flat=True)
+    ).count()
+
     # Appointment statistics
     total_appointments = Appointment.objects.count()
     today_appointments = Appointment.objects.filter(appointment_date=today).count()
     pending_appointments = Appointment.objects.filter(status='scheduled').count()
-    
+
     # System health (basic implementation - simplified)
     cpu_usage = 15.5  # Mock data for now
     memory_usage = 45.2  # Mock data for now
     disk_usage = 67.8  # Mock data for now
-    
+
     return Response({
         'total_users': total_users,
         'total_patients': total_patients,
         'total_doctors': total_doctors,
+        'patient_users_without_profiles': patient_users_without_profiles,
+        'doctor_users_without_profiles': doctor_users_without_profiles,
         'total_appointments': total_appointments,
         'today_appointments': today_appointments,
         'pending_appointments': pending_appointments,
@@ -130,10 +145,15 @@ def _get_doctor_stats(request):
                 'type': next_appointment.appointment_type
             }
 
+        # Get total patients this doctor has seen
+        total_patients = Appointment.objects.filter(
+            doctor=doctor.user
+        ).values('patient').distinct().count()
+
         return Response({
             'today_appointments': today_appointments,
             'upcoming_appointments': upcoming_appointments,
-            'total_patients': 0,  # TODO: Implement get_total_patients method
+            'total_patients': total_patients,
             'completed_appointments_today': completed_today,
             'pending_appointments': pending_appointments,
             'next_appointment': next_appointment_data

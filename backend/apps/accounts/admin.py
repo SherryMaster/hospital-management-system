@@ -3,6 +3,43 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.html import format_html
 from .models import User
 
+# Import Patient and Doctor models for inline editing
+try:
+    from apps.patients.models import Patient
+except ImportError:
+    Patient = None
+
+try:
+    from apps.doctors.models import Doctor
+except ImportError:
+    Doctor = None
+
+
+# Inline admin classes for Patient and Doctor profiles
+class PatientInline(admin.StackedInline):
+    """Inline admin for Patient profile"""
+    model = Patient
+    can_delete = False
+    verbose_name_plural = 'Patient Profile'
+    fields = [
+        'patient_id', 'blood_type', 'marital_status', 'height', 'weight',
+        'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship',
+        'allergies', 'medical_history', 'is_active'
+    ]
+    readonly_fields = ['patient_id']
+
+
+class DoctorInline(admin.StackedInline):
+    """Inline admin for Doctor profile"""
+    model = Doctor
+    can_delete = False
+    verbose_name_plural = 'Doctor Profile'
+    fields = [
+        'doctor_id', 'license_number', 'department', 'employment_status',
+        'consultation_fee', 'years_of_experience', 'is_accepting_patients', 'is_active'
+    ]
+    readonly_fields = ['doctor_id']
+
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
@@ -11,7 +48,7 @@ class UserAdmin(BaseUserAdmin):
     # List display
     list_display = [
         'username', 'email', 'get_full_name', 'role',
-        'is_active', 'is_verified', 'created_at', 'profile_picture_preview'
+        'has_profile', 'is_active', 'is_verified', 'created_at', 'profile_picture_preview'
     ]
 
     # List filters
@@ -101,12 +138,37 @@ class UserAdmin(BaseUserAdmin):
         return "No Image"
     profile_picture_preview.short_description = "Profile Picture"
 
+    def has_profile(self, obj):
+        """Check if user has associated profile based on role"""
+        if obj.role == 'patient' and Patient:
+            return hasattr(obj, 'patient_profile')
+        elif obj.role == 'doctor' and Doctor:
+            return hasattr(obj, 'doctor_profile')
+        return True  # Other roles don't need profiles
+    has_profile.boolean = True
+    has_profile.short_description = "Has Profile"
+
     def get_queryset(self, request):
         """Optimize queryset for admin list view"""
-        return super().get_queryset(request).select_related()
+        qs = super().get_queryset(request).select_related()
+        # Prefetch related profiles for better performance
+        if Patient:
+            qs = qs.prefetch_related('patient_profile')
+        if Doctor:
+            qs = qs.prefetch_related('doctor_profile')
+        return qs
+
+    def get_inlines(self, request, obj):
+        """Dynamically add inlines based on user role"""
+        inlines = []
+        if obj and obj.role == 'patient' and Patient:
+            inlines.append(PatientInline)
+        elif obj and obj.role == 'doctor' and Doctor:
+            inlines.append(DoctorInline)
+        return inlines
 
     # Actions
-    actions = ['activate_users', 'deactivate_users', 'verify_users']
+    actions = ['activate_users', 'deactivate_users', 'verify_users', 'create_missing_profiles']
 
     def activate_users(self, request, queryset):
         """Bulk activate users"""
@@ -125,3 +187,38 @@ class UserAdmin(BaseUserAdmin):
         updated = queryset.update(is_verified=True)
         self.message_user(request, f'{updated} users were successfully verified.')
     verify_users.short_description = "Verify selected users"
+
+    def create_missing_profiles(self, request, queryset):
+        """Create missing Patient/Doctor profiles for selected users"""
+        created_patients = 0
+        created_doctors = 0
+        errors = []
+
+        for user in queryset:
+            try:
+                if user.role == 'patient' and Patient and not hasattr(user, 'patient_profile'):
+                    Patient.objects.create(
+                        user=user,
+                        blood_type=Patient.BloodType.UNKNOWN,
+                        marital_status=Patient.MaritalStatus.SINGLE,
+                    )
+                    created_patients += 1
+                elif user.role == 'doctor' and Doctor and not hasattr(user, 'doctor_profile'):
+                    Doctor.objects.create(
+                        user=user,
+                        license_number=f"LIC{user.id:06d}",
+                        employment_status=Doctor.EmploymentStatus.FULL_TIME,
+                        consultation_fee=0.00,
+                        years_of_experience=0,
+                        is_accepting_patients=True,
+                    )
+                    created_doctors += 1
+            except Exception as e:
+                errors.append(f"Error creating profile for {user.username}: {str(e)}")
+
+        message = f'Created {created_patients} patient profiles and {created_doctors} doctor profiles.'
+        if errors:
+            message += f' Errors: {"; ".join(errors)}'
+
+        self.message_user(request, message)
+    create_missing_profiles.short_description = "Create missing profiles for selected users"

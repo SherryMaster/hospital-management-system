@@ -51,7 +51,7 @@ import {
 import { MainLayout } from '../components/layout';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
-import api from '../services/api';
+import { billingService } from '../services/api';
 
 const BillingPage = () => {
   const { user, logout } = useAuth();
@@ -79,77 +79,66 @@ const BillingPage = () => {
       setLoading(true);
       setError(null);
 
-      // For now, we'll use mock data since the billing endpoints might need adjustment
-      // TODO: Replace with actual API calls to /api/billing/
-      const mockInvoices = [
-        {
-          id: 1,
-          invoice_number: 'INV-2024-001',
-          patient: { id: 1, full_name: 'John Doe', patient_id: 'P001' },
-          appointment: { id: 1, date: '2024-01-15', doctor: 'Dr. Smith' },
-          total_amount: 250.00,
-          paid_amount: 250.00,
-          status: 'paid',
-          issue_date: '2024-01-15',
-          due_date: '2024-02-15',
-          payment_method: 'credit_card',
-        },
-        {
-          id: 2,
-          invoice_number: 'INV-2024-002',
-          patient: { id: 2, full_name: 'Jane Smith', patient_id: 'P002' },
-          appointment: { id: 2, date: '2024-01-20', doctor: 'Dr. Johnson' },
-          total_amount: 180.00,
-          paid_amount: 0.00,
-          status: 'pending',
-          issue_date: '2024-01-20',
-          due_date: '2024-02-20',
-          payment_method: null,
-        },
-        {
-          id: 3,
-          invoice_number: 'INV-2024-003',
-          patient: { id: 3, full_name: 'Bob Wilson', patient_id: 'P003' },
-          appointment: { id: 3, date: '2024-01-25', doctor: 'Dr. Brown' },
-          total_amount: 500.00,
-          paid_amount: 200.00,
-          status: 'partial',
-          issue_date: '2024-01-25',
-          due_date: '2024-02-25',
-          payment_method: 'cash',
-        },
-      ];
+      // Fetch real data from API
+      const [invoicesResult, paymentsResult] = await Promise.all([
+        billingService.getInvoices({ page_size: 100 }),
+        // Note: Payments endpoint might need to be implemented in backend
+        // For now, we'll extract payments from invoices
+        Promise.resolve({ data: { results: [] }, error: null })
+      ]);
 
-      const mockPayments = [
-        {
-          id: 1,
-          payment_id: 'PAY-2024-001',
-          invoice: { id: 1, invoice_number: 'INV-2024-001' },
-          patient: { id: 1, full_name: 'John Doe', patient_id: 'P001' },
-          amount: 250.00,
-          payment_method: 'credit_card',
-          payment_date: '2024-01-15',
-          status: 'completed',
-          transaction_id: 'TXN123456789',
-        },
-        {
-          id: 2,
-          payment_id: 'PAY-2024-002',
-          invoice: { id: 3, invoice_number: 'INV-2024-003' },
-          patient: { id: 3, full_name: 'Bob Wilson', patient_id: 'P003' },
-          amount: 200.00,
-          payment_method: 'cash',
-          payment_date: '2024-01-25',
-          status: 'completed',
-          transaction_id: null,
-        },
-      ];
+      if (invoicesResult.error) {
+        throw new Error(invoicesResult.error.message || 'Failed to fetch invoices');
+      }
 
-      setInvoices(mockInvoices);
-      setPayments(mockPayments);
+      // Process invoices data
+      const processedInvoices = (invoicesResult.data?.results || []).map(invoice => ({
+        id: invoice.id,
+        invoice_number: invoice.invoice_number,
+        patient: {
+          id: invoice.patient?.id,
+          full_name: invoice.patient?.user?.full_name || invoice.patient?.full_name || 'Unknown Patient',
+          patient_id: invoice.patient?.patient_id || 'N/A'
+        },
+        appointment: {
+          id: invoice.appointment?.id,
+          date: invoice.appointment?.appointment_date,
+          doctor: invoice.appointment?.doctor?.user?.full_name || invoice.appointment?.doctor?.full_name || 'Unknown Doctor'
+        },
+        total_amount: parseFloat(invoice.total_amount || 0),
+        paid_amount: parseFloat(invoice.paid_amount || 0),
+        status: invoice.status || 'pending',
+        issue_date: invoice.issue_date || invoice.created_at,
+        due_date: invoice.due_date,
+        payment_method: invoice.payment_method
+      }));
+
+      // Extract payments from invoices (if payment data is embedded)
+      const processedPayments = [];
+      processedInvoices.forEach(invoice => {
+        if (invoice.paid_amount > 0) {
+          processedPayments.push({
+            id: `payment-${invoice.id}`,
+            payment_id: `PAY-${invoice.invoice_number}`,
+            invoice: {
+              id: invoice.id,
+              invoice_number: invoice.invoice_number
+            },
+            patient: invoice.patient,
+            amount: invoice.paid_amount,
+            payment_method: invoice.payment_method || 'unknown',
+            payment_date: invoice.issue_date, // Assuming payment date is same as issue date for now
+            status: invoice.paid_amount >= invoice.total_amount ? 'completed' : 'partial',
+            transaction_id: `TXN-${invoice.id}`
+          });
+        }
+      });
+
+      setInvoices(processedInvoices);
+      setPayments(processedPayments);
     } catch (err) {
       console.error('Error fetching billing data:', err);
-      setError('Failed to load billing data. Please try again.');
+      setError(err.message || 'Failed to load billing data. Please try again.');
       showNotification('Failed to load billing data', 'error');
     } finally {
       setLoading(false);

@@ -47,7 +47,7 @@ import {
 import { MainLayout } from '../components/layout';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
-import api from '../services/api';
+import { medicalRecordsService } from '../services/api';
 
 const MedicalRecordsPage = () => {
   const { user, logout } = useAuth();
@@ -71,54 +71,42 @@ const MedicalRecordsPage = () => {
       setLoading(true);
       setError(null);
 
-      // For now, we'll use mock data since the medical records endpoints might need adjustment
-      // TODO: Replace with actual API calls to /api/patients/records/
-      const mockRecords = [
-        {
-          id: 1,
-          patient: { id: 1, full_name: 'John Doe', patient_id: 'P001' },
-          doctor: { id: 1, full_name: 'Dr. Smith', specialization: 'Cardiology' },
-          record_type: 'consultation',
-          diagnosis: 'Hypertension',
-          symptoms: 'High blood pressure, headaches',
-          treatment: 'Prescribed ACE inhibitors',
-          visit_date: '2024-01-15',
-          follow_up_date: '2024-02-15',
-          is_confidential: false,
-          status: 'completed',
-        },
-        {
-          id: 2,
-          patient: { id: 2, full_name: 'Jane Smith', patient_id: 'P002' },
-          doctor: { id: 2, full_name: 'Dr. Johnson', specialization: 'Neurology' },
-          record_type: 'diagnosis',
-          diagnosis: 'Migraine',
-          symptoms: 'Severe headaches, light sensitivity',
-          treatment: 'Pain management therapy',
-          visit_date: '2024-01-20',
-          follow_up_date: '2024-03-20',
-          is_confidential: false,
-          status: 'active',
-        },
-        {
-          id: 3,
-          patient: { id: 3, full_name: 'Bob Wilson', patient_id: 'P003' },
-          doctor: { id: 3, full_name: 'Dr. Brown', specialization: 'Orthopedics' },
-          record_type: 'surgery',
-          diagnosis: 'Knee replacement',
-          symptoms: 'Severe knee pain, mobility issues',
-          treatment: 'Total knee replacement surgery',
-          visit_date: '2024-01-25',
-          follow_up_date: '2024-04-25',
-          is_confidential: true,
-          status: 'completed',
-        },
-      ];
+      // Fetch real medical records from API
+      const result = await medicalRecordsService.getMedicalRecords({ page_size: 100 });
 
-      setRecords(mockRecords);
+      if (result.error) {
+        throw new Error(result.error.message || 'Failed to fetch medical records');
+      }
+
+      // Process medical records data
+      const processedRecords = (result.data?.results || []).map(record => ({
+        id: record.id,
+        patient: {
+          id: record.patient?.id,
+          full_name: record.patient?.user?.full_name || record.patient?.full_name || 'Unknown Patient',
+          patient_id: record.patient?.patient_id || 'N/A'
+        },
+        doctor: {
+          id: record.doctor?.id,
+          full_name: record.doctor?.user?.full_name || record.doctor?.full_name || 'Unknown Doctor',
+          specialization: record.doctor?.specializations?.[0]?.name ||
+                        record.doctor?.department?.name ||
+                        'General Medicine'
+        },
+        record_type: record.record_type || 'consultation',
+        diagnosis: record.diagnosis || record.chief_complaint || 'No diagnosis recorded',
+        symptoms: record.symptoms || record.chief_complaint || 'No symptoms recorded',
+        treatment: record.treatment || record.treatment_plan || 'No treatment recorded',
+        visit_date: record.visit_date || record.created_at,
+        follow_up_date: record.follow_up_date,
+        is_confidential: record.is_confidential || false,
+        status: record.status || 'completed'
+      }));
+
+      setRecords(processedRecords);
     } catch (err) {
       console.error('Error fetching medical records:', err);
-      setError('Failed to load medical records. Please try again.');
+      setError(err.message || 'Failed to load medical records. Please try again.');
       showNotification('Failed to load medical records', 'error');
     } finally {
       setLoading(false);
