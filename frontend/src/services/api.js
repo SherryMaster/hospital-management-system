@@ -247,7 +247,7 @@ export const authService = {
 
   getCurrentUser: async () => {
     try {
-      const response = await api.get('/auth/user/');
+      const response = await api.get('/auth/profile/');
       return { data: response.data, error: null };
     } catch (error) {
       return { data: null, error: handleApiError(error) };
@@ -379,6 +379,15 @@ export const patientService = {
     }
   },
 
+  createPatient: async (patientData) => {
+    try {
+      const response = await api.post('/patients/', patientData);
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
   updatePatient: async (patientId, patientData) => {
     try {
       const response = await api.patch(`/patients/${patientId}/`, patientData);
@@ -388,9 +397,45 @@ export const patientService = {
     }
   },
 
+  deletePatient: async (patientId) => {
+    try {
+      await api.delete(`/patients/${patientId}/`);
+      return { data: { message: 'Patient deleted successfully' }, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
   getMedicalRecords: async (patientId) => {
     try {
-      const response = await api.get(`/patients/${patientId}/medical-records/`);
+      const response = await api.get(`/patients/${patientId}/records/`);
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  getMedicalHistory: async (patientId) => {
+    try {
+      const response = await api.get(`/patients/${patientId}/history/`);
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  getMyProfile: async () => {
+    try {
+      const response = await api.get('/patients/me/');
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  updateMyProfile: async (patientData) => {
+    try {
+      const response = await api.patch('/patients/me/', patientData);
       return { data: response.data, error: null };
     } catch (error) {
       return { data: null, error: handleApiError(error) };
@@ -417,9 +462,200 @@ export const doctorService = {
     }
   },
 
+  createDoctor: async (doctorData) => {
+    try {
+      const response = await api.post('/doctors/', doctorData);
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  updateDoctor: async (doctorId, doctorData) => {
+    try {
+      const response = await api.patch(`/doctors/${doctorId}/`, doctorData);
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
   updateAvailability: async (doctorId, availabilityData) => {
     try {
       const response = await api.patch(`/doctors/${doctorId}/availability/`, availabilityData);
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  getAvailability: async (doctorId) => {
+    try {
+      const response = await api.get(`/doctors/${doctorId}/availability/`);
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  getSchedule: async (doctorId, params = {}) => {
+    try {
+      const response = await api.get(`/doctors/${doctorId}/schedule/`, { params });
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  getDepartments: async () => {
+    try {
+      const response = await api.get('/doctors/departments/');
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  getSpecializations: async () => {
+    try {
+      const response = await api.get('/doctors/specializations/');
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  getMyProfile: async () => {
+    try {
+      const response = await api.get('/doctors/me/');
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+};
+
+// Dashboard and Statistics Service
+export const dashboardService = {
+  getStats: async () => {
+    try {
+      const response = await api.get('/dashboard/stats/');
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  getRecentUsers: async (limit = 5) => {
+    try {
+      const response = await api.get('/auth/users/', {
+        params: { page_size: limit, ordering: '-created_at' }
+      });
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  getSystemHealth: async () => {
+    try {
+      const response = await api.get('/health/');
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  getTodayAppointments: async () => {
+    try {
+      const response = await api.get('/appointments/today/');
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+};
+
+// Billing Service
+export const billingService = {
+  getInvoices: async (params = {}) => {
+    try {
+      const response = await api.get('/billing/invoices/', { params });
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  getInvoice: async (invoiceId) => {
+    try {
+      const response = await api.get(`/billing/invoices/${invoiceId}/`);
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  createInvoice: async (invoiceData) => {
+    try {
+      const response = await api.post('/billing/invoices/', invoiceData);
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  updateInvoice: async (invoiceId, invoiceData) => {
+    try {
+      const response = await api.patch(`/billing/invoices/${invoiceId}/`, invoiceData);
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  payInvoice: async (invoiceId, paymentData) => {
+    try {
+      const response = await api.post(`/billing/invoices/${invoiceId}/pay/`, paymentData);
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+};
+
+// Medical Records Service
+export const medicalRecordsService = {
+  getMedicalRecords: async (params = {}) => {
+    try {
+      const response = await api.get('/patients/records/', { params });
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  getMedicalRecord: async (recordId) => {
+    try {
+      const response = await api.get(`/patients/records/${recordId}/`);
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  createMedicalRecord: async (recordData) => {
+    try {
+      const response = await api.post('/patients/records/', recordData);
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  updateMedicalRecord: async (recordId, recordData) => {
+    try {
+      const response = await api.patch(`/patients/records/${recordId}/`, recordData);
       return { data: response.data, error: null };
     } catch (error) {
       return { data: null, error: handleApiError(error) };

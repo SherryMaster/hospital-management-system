@@ -13,8 +13,10 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
 import theme from './theme';
 import { AuthProvider } from './contexts/AuthContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 // import { AppProvider } from './contexts/AppContext';
 import { ProtectedRoute } from './components';
+import ErrorBoundary from './components/common/ErrorBoundary';
 // import NotificationSystem from './components/common/NotificationSystem';
 // import LoadingOverlay from './components/common/LoadingOverlay';
 
@@ -26,6 +28,10 @@ import UnauthorizedPage from './pages/UnauthorizedPage';
 import { AppointmentBooking, AppointmentCalendar, AppointmentManagement } from './pages/appointments';
 import { PatientPortal } from './pages/patient';
 import { DoctorPortal } from './pages/doctor';
+import UsersPage from './pages/admin/UsersPage';
+import PatientsPage from './pages/PatientsPage';
+import DoctorsPage from './pages/DoctorsPage';
+import AppointmentsPage from './pages/AppointmentsPage';
 
 // App Routes Component
 const AppRoutes = () => {
@@ -72,6 +78,40 @@ const AppRoutes = () => {
         }
       />
 
+      {/* Management Routes */}
+      <Route
+        path="/users"
+        element={
+          <ProtectedRoute requiredRoles={['admin']}>
+            <UsersPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/patients"
+        element={
+          <ProtectedRoute requiredRoles={['admin', 'doctor', 'nurse', 'receptionist']}>
+            <PatientsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/doctors"
+        element={
+          <ProtectedRoute requiredRoles={['admin', 'receptionist']}>
+            <DoctorsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/appointments"
+        element={
+          <ProtectedRoute requiredRoles={['admin', 'doctor', 'nurse', 'receptionist']}>
+            <AppointmentsPage />
+          </ProtectedRoute>
+        }
+      />
+
       {/* Portal Routes */}
       <Route
         path="/patient/portal"
@@ -99,22 +139,26 @@ const AppRoutes = () => {
 
 function App() {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <LocalizationProvider dateAdapter={AdapterDayjs}>
-        <AuthProvider>
-          {/* <AppProvider> */}
-            <Router>
-              <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
-                <AppRoutes />
-                {/* <NotificationSystem />
-                <LoadingOverlay /> */}
-              </Box>
-            </Router>
-          {/* </AppProvider> */}
-        </AuthProvider>
-      </LocalizationProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <LocalizationProvider dateAdapter={AdapterDayjs}>
+          <AuthProvider>
+            <NotificationProvider>
+              {/* <AppProvider> */}
+                <Router>
+                  <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
+                    <AppRoutes />
+                    {/* <NotificationSystem />
+                    <LoadingOverlay /> */}
+                  </Box>
+                </Router>
+              {/* </AppProvider> */}
+            </NotificationProvider>
+          </AuthProvider>
+        </LocalizationProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }
 

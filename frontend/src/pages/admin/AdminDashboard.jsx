@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Grid,
@@ -38,72 +39,57 @@ import {
 } from '@mui/icons-material';
 import { MainLayout } from '../../components/layout';
 import { useAuth } from '../../contexts/AuthContext';
+import { useDashboard } from '../../hooks/useApi';
 
 const AdminDashboard = () => {
+  const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [dashboardData, setDashboardData] = useState({
-    stats: {
-      totalUsers: 0,
-      totalPatients: 0,
-      totalDoctors: 0,
-      totalAppointments: 0,
-      pendingAppointments: 0,
-      totalRevenue: 0,
-      pendingInvoices: 0,
-    },
-    recentUsers: [],
-    systemHealth: {
-      status: 'healthy',
-      uptime: '99.9%',
-      responseTime: '120ms',
-    },
-    alerts: [],
-  });
+  const {
+    stats,
+    recentUsers,
+    systemHealth,
+    todayAppointments,
+    loading,
+    error,
+    refetch,
+  } = useDashboard();
+
   const [anchorEl, setAnchorEl] = useState(null);
+  const [alerts, setAlerts] = useState([]);
 
   useEffect(() => {
-    loadDashboardData();
-  }, []);
+    // Generate alerts based on dashboard data
+    const newAlerts = [];
 
-  const loadDashboardData = async () => {
-    setLoading(true);
-    try {
-      // TODO: Replace with actual API calls
-      // Simulated data for now
-      setTimeout(() => {
-        setDashboardData({
-          stats: {
-            totalUsers: 156,
-            totalPatients: 89,
-            totalDoctors: 12,
-            totalAppointments: 234,
-            pendingAppointments: 18,
-            totalRevenue: 45670.50,
-            pendingInvoices: 7,
-          },
-          recentUsers: [
-            { id: 1, name: 'John Doe', role: 'patient', email: 'john@example.com', joinedAt: '2024-01-15' },
-            { id: 2, name: 'Dr. Smith', role: 'doctor', email: 'smith@hospital.com', joinedAt: '2024-01-14' },
-            { id: 3, name: 'Jane Wilson', role: 'nurse', email: 'jane@hospital.com', joinedAt: '2024-01-13' },
-          ],
-          systemHealth: {
-            status: 'healthy',
-            uptime: '99.9%',
-            responseTime: '120ms',
-          },
-          alerts: [
-            { id: 1, type: 'warning', message: '7 pending invoices require attention', priority: 'medium' },
-            { id: 2, type: 'info', message: 'System backup completed successfully', priority: 'low' },
-          ],
-        });
-        setLoading(false);
-      }, 1000);
-    } catch (error) {
-      console.error('Error loading dashboard data:', error);
-      setLoading(false);
+    if (stats?.pendingInvoices > 0) {
+      newAlerts.push({
+        id: 1,
+        type: 'warning',
+        message: `${stats.pendingInvoices} pending invoices require attention`,
+        priority: 'medium'
+      });
     }
-  };
+
+    if (stats?.pendingAppointments > 10) {
+      newAlerts.push({
+        id: 2,
+        type: 'info',
+        message: `${stats.pendingAppointments} appointments pending confirmation`,
+        priority: 'low'
+      });
+    }
+
+    if (systemHealth?.status === 'healthy') {
+      newAlerts.push({
+        id: 3,
+        type: 'success',
+        message: 'All systems operational',
+        priority: 'low'
+      });
+    }
+
+    setAlerts(newAlerts);
+  }, [stats, systemHealth]);
 
   const handleMenuClick = (event) => {
     setAnchorEl(event.currentTarget);
@@ -111,6 +97,14 @@ const AdminDashboard = () => {
 
   const handleMenuClose = () => {
     setAnchorEl(null);
+  };
+
+  const handleNavigation = (path) => {
+    navigate(path);
+  };
+
+  const handleRefresh = () => {
+    refetch();
   };
 
   const getRoleColor = (role) => {
@@ -134,14 +128,14 @@ const AdminDashboard = () => {
     }
   };
 
-  const StatCard = ({ title, value, icon, color, subtitle, action }) => (
+  const StatCard = ({ title, value, icon, color, subtitle, action, onActionClick }) => (
     <Card sx={{ height: '100%' }}>
       <CardContent>
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <Box 
-            sx={{ 
-              p: 1, 
-              borderRadius: 1, 
+          <Box
+            sx={{
+              p: 1,
+              borderRadius: 1,
               bgcolor: `${color}.light`,
               color: `${color}.main`,
               mr: 2,
@@ -166,7 +160,7 @@ const AdminDashboard = () => {
       </CardContent>
       {action && (
         <CardActions>
-          <Button size="small" color={color}>
+          <Button size="small" color={color} onClick={onActionClick}>
             {action}
           </Button>
         </CardActions>
@@ -204,7 +198,7 @@ const AdminDashboard = () => {
             </Typography>
           </Box>
           <Box>
-            <IconButton onClick={loadDashboardData} color="primary">
+            <IconButton onClick={handleRefresh} color="primary" disabled={loading}>
               <RefreshIcon />
             </IconButton>
             <IconButton onClick={handleMenuClick}>
@@ -215,11 +209,11 @@ const AdminDashboard = () => {
               open={Boolean(anchorEl)}
               onClose={handleMenuClose}
             >
-              <MenuItem onClick={handleMenuClose}>
+              <MenuItem onClick={() => { handleMenuClose(); handleNavigation('/settings'); }}>
                 <SettingsIcon sx={{ mr: 1 }} />
                 System Settings
               </MenuItem>
-              <MenuItem onClick={handleMenuClose}>
+              <MenuItem onClick={() => { handleMenuClose(); handleNavigation('/users'); }}>
                 <PeopleIcon sx={{ mr: 1 }} />
                 User Management
               </MenuItem>
@@ -228,9 +222,14 @@ const AdminDashboard = () => {
         </Box>
 
         {/* System Alerts */}
-        {dashboardData.alerts.length > 0 && (
+        {error && (
+          <Alert severity="error" sx={{ mb: 4 }}>
+            {error}
+          </Alert>
+        )}
+        {alerts.length > 0 && (
           <Box sx={{ mb: 4 }}>
-            {dashboardData.alerts.map((alert) => (
+            {alerts.map((alert) => (
               <Alert
                 key={alert.id}
                 severity={alert.type}
@@ -248,38 +247,42 @@ const AdminDashboard = () => {
           <Grid item xs={12} sm={6} md={3}>
             <StatCard
               title="Total Users"
-              value={dashboardData.stats.totalUsers}
+              value={stats?.totalUsers || 0}
               icon={<PeopleIcon />}
               color="primary"
               action="Manage Users"
+              onActionClick={() => handleNavigation('/users')}
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
             <StatCard
               title="Active Patients"
-              value={dashboardData.stats.totalPatients}
+              value={stats?.totalPatients || 0}
               icon={<HospitalIcon />}
               color="success"
               action="View Patients"
+              onActionClick={() => handleNavigation('/patients')}
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
             <StatCard
               title="Available Doctors"
-              value={dashboardData.stats.totalDoctors}
+              value={stats?.totalDoctors || 0}
               icon={<PeopleIcon />}
               color="info"
               action="View Doctors"
+              onActionClick={() => handleNavigation('/doctors')}
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
             <StatCard
               title="Total Appointments"
-              value={dashboardData.stats.totalAppointments}
+              value={stats?.totalAppointments || 0}
               icon={<CalendarIcon />}
               color="secondary"
-              subtitle={`${dashboardData.stats.pendingAppointments} pending`}
+              subtitle={stats?.pendingAppointments ? `${stats.pendingAppointments} pending` : ''}
               action="View Calendar"
+              onActionClick={() => handleNavigation('/appointments/calendar')}
             />
           </Grid>
         </Grid>
@@ -289,29 +292,32 @@ const AdminDashboard = () => {
           <Grid item xs={12} sm={6} md={4}>
             <StatCard
               title="Total Revenue"
-              value={`$${dashboardData.stats.totalRevenue.toLocaleString()}`}
+              value={stats?.totalRevenue ? `$${stats.totalRevenue.toLocaleString()}` : '$0'}
               icon={<TrendingUpIcon />}
               color="success"
               action="View Reports"
+              onActionClick={() => handleNavigation('/billing')}
             />
           </Grid>
           <Grid item xs={12} sm={6} md={4}>
             <StatCard
               title="Pending Invoices"
-              value={dashboardData.stats.pendingInvoices}
+              value={stats?.pendingInvoices || 0}
               icon={<ReceiptIcon />}
               color="warning"
               action="Review Invoices"
+              onActionClick={() => handleNavigation('/billing')}
             />
           </Grid>
           <Grid item xs={12} sm={6} md={4}>
             <StatCard
               title="System Health"
-              value={dashboardData.systemHealth.status.toUpperCase()}
+              value={systemHealth?.status?.toUpperCase() || 'UNKNOWN'}
               icon={<CheckCircleIcon />}
-              color="success"
-              subtitle={`Uptime: ${dashboardData.systemHealth.uptime}`}
+              color={systemHealth?.status === 'healthy' ? 'success' : 'error'}
+              subtitle={systemHealth?.uptime ? `Uptime: ${systemHealth.uptime}` : ''}
               action="View Details"
+              onActionClick={() => handleNavigation('/system-health')}
             />
           </Grid>
         </Grid>
@@ -325,34 +331,51 @@ const AdminDashboard = () => {
                   Recent Users
                 </Typography>
                 <Divider sx={{ mb: 2 }} />
-                {dashboardData.recentUsers.map((user, index) => (
-                  <Box key={user.id}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', py: 1 }}>
-                      <Avatar sx={{ mr: 2, bgcolor: 'primary.main' }}>
-                        {user.name.charAt(0)}
-                      </Avatar>
-                      <Box sx={{ flexGrow: 1 }}>
-                        <Typography variant="body1">{user.name}</Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {user.email}
-                        </Typography>
+                {recentUsers && recentUsers.length > 0 ? (
+                  recentUsers.map((user, index) => (
+                    <Box key={user.id}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', py: 1 }}>
+                        <Avatar sx={{ mr: 2, bgcolor: 'primary.main' }}>
+                          {(user.full_name || user.first_name || user.email || 'U').charAt(0).toUpperCase()}
+                        </Avatar>
+                        <Box sx={{ flexGrow: 1 }}>
+                          <Typography variant="body1">
+                            {user.full_name || `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {user.email}
+                          </Typography>
+                        </Box>
+                        <Chip
+                          label={user.role}
+                          size="small"
+                          color={getRoleColor(user.role)}
+                          variant="outlined"
+                        />
                       </Box>
-                      <Chip
-                        label={user.role}
-                        size="small"
-                        color={getRoleColor(user.role)}
-                        variant="outlined"
-                      />
+                      {index < recentUsers.length - 1 && <Divider />}
                     </Box>
-                    {index < dashboardData.recentUsers.length - 1 && <Divider />}
-                  </Box>
-                ))}
+                  ))
+                ) : (
+                  <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
+                    No recent users to display
+                  </Typography>
+                )}
               </CardContent>
               <CardActions>
-                <Button size="small" startIcon={<PersonAddIcon />}>
+                <Button
+                  size="small"
+                  startIcon={<PersonAddIcon />}
+                  onClick={() => handleNavigation('/users')}
+                >
                   Add New User
                 </Button>
-                <Button size="small">View All Users</Button>
+                <Button
+                  size="small"
+                  onClick={() => handleNavigation('/users')}
+                >
+                  View All Users
+                </Button>
               </CardActions>
             </Card>
           </Grid>
@@ -371,6 +394,7 @@ const AdminDashboard = () => {
                       variant="outlined"
                       startIcon={<PersonAddIcon />}
                       sx={{ mb: 1 }}
+                      onClick={() => handleNavigation('/users')}
                     >
                       Add User
                     </Button>
@@ -381,6 +405,7 @@ const AdminDashboard = () => {
                       variant="outlined"
                       startIcon={<CalendarIcon />}
                       sx={{ mb: 1 }}
+                      onClick={() => handleNavigation('/appointments/calendar')}
                     >
                       View Calendar
                     </Button>
@@ -391,6 +416,7 @@ const AdminDashboard = () => {
                       variant="outlined"
                       startIcon={<ReceiptIcon />}
                       sx={{ mb: 1 }}
+                      onClick={() => handleNavigation('/billing')}
                     >
                       Billing
                     </Button>
@@ -401,6 +427,7 @@ const AdminDashboard = () => {
                       variant="outlined"
                       startIcon={<TrendingUpIcon />}
                       sx={{ mb: 1 }}
+                      onClick={() => handleNavigation('/analytics')}
                     >
                       Analytics
                     </Button>

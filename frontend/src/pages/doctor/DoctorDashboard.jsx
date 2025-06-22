@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Grid,
@@ -25,6 +26,7 @@ import {
   LinearProgress,
   Badge,
   Paper,
+  Alert,
 } from '@mui/material';
 import {
   CalendarToday as CalendarIcon,
@@ -42,114 +44,92 @@ import {
 } from '@mui/icons-material';
 import { MainLayout } from '../../components/layout';
 import { useAuth } from '../../contexts/AuthContext';
+import { useDashboard, useAppointments, usePatients } from '../../hooks/useApi';
 
 const DoctorDashboard = () => {
+  const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [dashboardData, setDashboardData] = useState({
-    todayStats: {
-      totalAppointments: 0,
-      completedAppointments: 0,
-      upcomingAppointments: 0,
-      cancelledAppointments: 0,
-    },
-    todayAppointments: [],
-    recentPatients: [],
-    notifications: [],
-  });
+  const {
+    stats,
+    todayAppointments,
+    loading: dashboardLoading,
+    error: dashboardError,
+    refetch: refetchDashboard,
+  } = useDashboard();
+
+  const {
+    appointments,
+    loading: appointmentsLoading,
+    error: appointmentsError,
+    fetchAppointments,
+  } = useAppointments();
+
+  const {
+    patients,
+    loading: patientsLoading,
+    error: patientsError,
+    fetchPatients,
+  } = usePatients();
+
+  const [notifications, setNotifications] = useState([]);
 
   useEffect(() => {
-    loadDashboardData();
-  }, []);
+    // Load doctor's appointments for today
+    const today = new Date().toISOString().split('T')[0];
+    fetchAppointments({
+      doctor: user?.id,
+      date: today,
+    });
 
-  const loadDashboardData = async () => {
-    setLoading(true);
-    try {
-      // TODO: Replace with actual API calls
-      // Simulated data for now
-      setTimeout(() => {
-        setDashboardData({
-          todayStats: {
-            totalAppointments: 8,
-            completedAppointments: 3,
-            upcomingAppointments: 4,
-            cancelledAppointments: 1,
-          },
-          todayAppointments: [
-            {
-              id: 1,
-              patient: 'John Doe',
-              time: '09:00 AM',
-              type: 'consultation',
-              status: 'completed',
-              duration: '30 min',
-            },
-            {
-              id: 2,
-              patient: 'Jane Smith',
-              time: '10:30 AM',
-              type: 'follow-up',
-              status: 'completed',
-              duration: '20 min',
-            },
-            {
-              id: 3,
-              patient: 'Mike Johnson',
-              time: '02:00 PM',
-              type: 'consultation',
-              status: 'upcoming',
-              duration: '30 min',
-            },
-            {
-              id: 4,
-              patient: 'Sarah Wilson',
-              time: '03:30 PM',
-              type: 'check-up',
-              status: 'upcoming',
-              duration: '45 min',
-            },
-          ],
-          recentPatients: [
-            {
-              id: 1,
-              name: 'John Doe',
-              lastVisit: '2024-01-15',
-              condition: 'Hypertension',
-              nextAppointment: '2024-01-22',
-            },
-            {
-              id: 2,
-              name: 'Jane Smith',
-              lastVisit: '2024-01-14',
-              condition: 'Diabetes',
-              nextAppointment: '2024-01-21',
-            },
-            {
-              id: 3,
-              name: 'Mike Johnson',
-              lastVisit: '2024-01-13',
-              condition: 'Regular Checkup',
-              nextAppointment: null,
-            },
-          ],
-          notifications: [
-            { id: 1, message: 'New appointment request from Emma Davis', time: '10 min ago', type: 'appointment' },
-            { id: 2, message: 'Lab results available for John Doe', time: '1 hour ago', type: 'lab' },
-            { id: 3, message: 'Prescription refill request from Jane Smith', time: '2 hours ago', type: 'prescription' },
-          ],
-        });
-        setLoading(false);
-      }, 1000);
-    } catch (error) {
-      console.error('Error loading dashboard data:', error);
-      setLoading(false);
-    }
+    // Load recent patients
+    fetchPatients({
+      doctor: user?.id,
+      page_size: 5,
+      ordering: '-last_visit_date',
+    });
+
+    // Mock notifications for now
+    setNotifications([
+      { id: 1, message: 'New appointment request pending approval', time: '10 min ago', type: 'appointment' },
+      { id: 2, message: 'Lab results available for review', time: '1 hour ago', type: 'lab' },
+      { id: 3, message: 'Prescription refill request', time: '2 hours ago', type: 'prescription' },
+    ]);
+  }, [user, fetchAppointments, fetchPatients]);
+
+  const loading = dashboardLoading || appointmentsLoading || patientsLoading;
+  const error = dashboardError || appointmentsError || patientsError;
+
+  // Calculate today's stats from appointments
+  const todayStats = {
+    totalAppointments: appointments?.length || 0,
+    completedAppointments: appointments?.filter(apt => apt.status === 'completed').length || 0,
+    upcomingAppointments: appointments?.filter(apt => apt.status === 'scheduled' || apt.status === 'confirmed').length || 0,
+    cancelledAppointments: appointments?.filter(apt => apt.status === 'cancelled').length || 0,
+  };
+
+  const handleNavigation = (path) => {
+    navigate(path);
+  };
+
+  const handleRefresh = () => {
+    refetchDashboard();
+    const today = new Date().toISOString().split('T')[0];
+    fetchAppointments({
+      doctor: user?.id,
+      date: today,
+    });
+    fetchPatients({
+      doctor: user?.id,
+      page_size: 5,
+      ordering: '-last_visit_date',
+    });
   };
 
   const getStatusColor = (status) => {
     switch (status) {
       case 'completed': return 'success';
-      case 'upcoming': return 'primary';
+      case 'scheduled':
+      case 'confirmed': return 'primary';
       case 'cancelled': return 'error';
       case 'in-progress': return 'warning';
       default: return 'default';
@@ -163,6 +143,25 @@ const DoctorDashboard = () => {
       case 'check-up': return <HospitalIcon />;
       default: return <CalendarIcon />;
     }
+  };
+
+  const formatTime = (timeString) => {
+    if (!timeString) return '';
+    try {
+      const time = new Date(`2000-01-01T${timeString}`);
+      return time.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch {
+      return timeString;
+    }
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString();
   };
 
   const StatCard = ({ title, value, icon, color, subtitle }) => (
@@ -223,21 +222,28 @@ const DoctorDashboard = () => {
             Good morning, Dr. {user?.last_name || user?.full_name?.split(' ')[1] || 'Doctor'}!
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            Here's your schedule for today, {new Date().toLocaleDateString('en-US', { 
-              weekday: 'long', 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric' 
+            Here's your schedule for today, {new Date().toLocaleDateString('en-US', {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
             })}
           </Typography>
         </Box>
+
+        {/* Error Alert */}
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
+        )}
 
         {/* Today's Statistics */}
         <Grid container spacing={3} sx={{ mb: 4 }}>
           <Grid item xs={12} sm={6} md={3}>
             <StatCard
               title="Total Appointments"
-              value={dashboardData.todayStats.totalAppointments}
+              value={todayStats.totalAppointments}
               icon={<CalendarIcon />}
               color="primary"
             />
@@ -245,7 +251,7 @@ const DoctorDashboard = () => {
           <Grid item xs={12} sm={6} md={3}>
             <StatCard
               title="Completed"
-              value={dashboardData.todayStats.completedAppointments}
+              value={todayStats.completedAppointments}
               icon={<HospitalIcon />}
               color="success"
             />
@@ -253,7 +259,7 @@ const DoctorDashboard = () => {
           <Grid item xs={12} sm={6} md={3}>
             <StatCard
               title="Upcoming"
-              value={dashboardData.todayStats.upcomingAppointments}
+              value={todayStats.upcomingAppointments}
               icon={<ScheduleIcon />}
               color="info"
             />
@@ -261,7 +267,7 @@ const DoctorDashboard = () => {
           <Grid item xs={12} sm={6} md={3}>
             <StatCard
               title="Cancelled"
-              value={dashboardData.todayStats.cancelledAppointments}
+              value={todayStats.cancelledAppointments}
               icon={<TimeIcon />}
               color="error"
             />
@@ -281,55 +287,71 @@ const DoctorDashboard = () => {
                     variant="outlined"
                     size="small"
                     startIcon={<AddIcon />}
+                    onClick={() => handleNavigation('/appointments/book')}
                   >
                     Add Appointment
                   </Button>
                 </Box>
                 <Divider sx={{ mb: 2 }} />
                 <List>
-                  {dashboardData.todayAppointments.map((appointment, index) => (
-                    <React.Fragment key={appointment.id}>
-                      <ListItem>
-                        <ListItemAvatar>
-                          <Avatar sx={{ bgcolor: 'primary.main' }}>
-                            {getAppointmentTypeIcon(appointment.type)}
-                          </Avatar>
-                        </ListItemAvatar>
-                        <ListItemText
-                          primary={
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <span>
-                                {appointment.patient}
-                              </span>
-                              <Chip
-                                label={appointment.status}
-                                size="small"
-                                color={getStatusColor(appointment.status)}
-                                variant="outlined"
-                              />
-                            </Box>
-                          }
-                          secondary={`${appointment.time} • ${appointment.duration} • ${appointment.type}`}
-                        />
-                        <ListItemSecondaryAction>
-                          <IconButton edge="end" color="primary">
-                            <PhoneIcon />
-                          </IconButton>
-                          <IconButton edge="end" color="primary">
-                            <VideoCallIcon />
-                          </IconButton>
-                        </ListItemSecondaryAction>
-                      </ListItem>
-                      {index < dashboardData.todayAppointments.length - 1 && <Divider />}
-                    </React.Fragment>
-                  ))}
+                  {appointments && appointments.length > 0 ? (
+                    appointments.map((appointment, index) => (
+                      <React.Fragment key={appointment.id}>
+                        <ListItem>
+                          <ListItemAvatar>
+                            <Avatar sx={{ bgcolor: 'primary.main' }}>
+                              {getAppointmentTypeIcon(appointment.appointment_type)}
+                            </Avatar>
+                          </ListItemAvatar>
+                          <ListItemText
+                            primary={
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <span>
+                                  {appointment.patient?.full_name || 'Unknown Patient'}
+                                </span>
+                                <Chip
+                                  label={appointment.status}
+                                  size="small"
+                                  color={getStatusColor(appointment.status)}
+                                  variant="outlined"
+                                />
+                              </Box>
+                            }
+                            secondary={`${formatTime(appointment.appointment_time)} • ${appointment.appointment_type || 'consultation'}`}
+                          />
+                          <ListItemSecondaryAction>
+                            <IconButton edge="end" color="primary">
+                              <PhoneIcon />
+                            </IconButton>
+                            <IconButton edge="end" color="primary">
+                              <VideoCallIcon />
+                            </IconButton>
+                          </ListItemSecondaryAction>
+                        </ListItem>
+                        {index < appointments.length - 1 && <Divider />}
+                      </React.Fragment>
+                    ))
+                  ) : (
+                    <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
+                      No appointments scheduled for today
+                    </Typography>
+                  )}
                 </List>
               </CardContent>
               <CardActions>
-                <Button size="small" startIcon={<CalendarIcon />}>
+                <Button
+                  size="small"
+                  startIcon={<CalendarIcon />}
+                  onClick={() => handleNavigation('/appointments/calendar')}
+                >
                   View Full Schedule
                 </Button>
-                <Button size="small">Manage Availability</Button>
+                <Button
+                  size="small"
+                  onClick={() => handleNavigation('/doctor/availability')}
+                >
+                  Manage Availability
+                </Button>
               </CardActions>
             </Card>
           </Grid>
@@ -344,35 +366,45 @@ const DoctorDashboard = () => {
                 </Typography>
                 <Divider sx={{ mb: 2 }} />
                 <List dense>
-                  {dashboardData.recentPatients.map((patient, index) => (
-                    <React.Fragment key={patient.id}>
-                      <ListItem>
-                        <ListItemAvatar>
-                          <Avatar sx={{ bgcolor: 'secondary.main' }}>
-                            <PersonIcon />
-                          </Avatar>
-                        </ListItemAvatar>
-                        <ListItemText
-                          primary={patient.name}
-                          secondary={
-                            <React.Fragment>
-                              <span style={{ display: 'block', fontSize: '0.75rem' }}>
-                                Last visit: {patient.lastVisit}
-                              </span>
-                              <span style={{ display: 'block', fontSize: '0.75rem', color: '#1976d2' }}>
-                                {patient.condition}
-                              </span>
-                            </React.Fragment>
-                          }
-                        />
-                      </ListItem>
-                      {index < dashboardData.recentPatients.length - 1 && <Divider />}
-                    </React.Fragment>
-                  ))}
+                  {patients && patients.length > 0 ? (
+                    patients.map((patient, index) => (
+                      <React.Fragment key={patient.id}>
+                        <ListItem>
+                          <ListItemAvatar>
+                            <Avatar sx={{ bgcolor: 'secondary.main' }}>
+                              <PersonIcon />
+                            </Avatar>
+                          </ListItemAvatar>
+                          <ListItemText
+                            primary={patient.user?.full_name || 'Unknown Patient'}
+                            secondary={
+                              <React.Fragment>
+                                <span style={{ display: 'block', fontSize: '0.75rem' }}>
+                                  Last visit: {formatDate(patient.last_visit_date)}
+                                </span>
+                                <span style={{ display: 'block', fontSize: '0.75rem', color: '#1976d2' }}>
+                                  {patient.chronic_conditions || 'No conditions noted'}
+                                </span>
+                              </React.Fragment>
+                            }
+                          />
+                        </ListItem>
+                        {index < patients.length - 1 && <Divider />}
+                      </React.Fragment>
+                    ))
+                  ) : (
+                    <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
+                      No recent patients
+                    </Typography>
+                  )}
                 </List>
               </CardContent>
               <CardActions>
-                <Button size="small" startIcon={<PeopleIcon />}>
+                <Button
+                  size="small"
+                  startIcon={<PeopleIcon />}
+                  onClick={() => handleNavigation('/patients')}
+                >
                   View All Patients
                 </Button>
               </CardActions>
@@ -382,7 +414,7 @@ const DoctorDashboard = () => {
             <Card>
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <Badge badgeContent={dashboardData.notifications.length} color="error">
+                  <Badge badgeContent={notifications.length} color="error">
                     <NotificationsIcon />
                   </Badge>
                   <Typography variant="h6" sx={{ ml: 1 }}>
@@ -391,17 +423,23 @@ const DoctorDashboard = () => {
                 </Box>
                 <Divider sx={{ mb: 2 }} />
                 <List dense>
-                  {dashboardData.notifications.map((notification, index) => (
-                    <React.Fragment key={notification.id}>
-                      <ListItem>
-                        <ListItemText
-                          primary={notification.message}
-                          secondary={notification.time}
-                        />
-                      </ListItem>
-                      {index < dashboardData.notifications.length - 1 && <Divider />}
-                    </React.Fragment>
-                  ))}
+                  {notifications.length > 0 ? (
+                    notifications.map((notification, index) => (
+                      <React.Fragment key={notification.id}>
+                        <ListItem>
+                          <ListItemText
+                            primary={notification.message}
+                            secondary={notification.time}
+                          />
+                        </ListItem>
+                        {index < notifications.length - 1 && <Divider />}
+                      </React.Fragment>
+                    ))
+                  ) : (
+                    <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
+                      No new notifications
+                    </Typography>
+                  )}
                 </List>
               </CardContent>
               <CardActions>
@@ -424,6 +462,7 @@ const DoctorDashboard = () => {
                 variant="outlined"
                 startIcon={<AddIcon />}
                 sx={{ py: 1.5 }}
+                onClick={() => handleNavigation('/appointments/book')}
               >
                 New Appointment
               </Button>
@@ -434,6 +473,7 @@ const DoctorDashboard = () => {
                 variant="outlined"
                 startIcon={<AssignmentIcon />}
                 sx={{ py: 1.5 }}
+                onClick={() => handleNavigation('/patients')}
               >
                 Patient Records
               </Button>
@@ -444,6 +484,7 @@ const DoctorDashboard = () => {
                 variant="outlined"
                 startIcon={<ScheduleIcon />}
                 sx={{ py: 1.5 }}
+                onClick={() => handleNavigation('/doctor/availability')}
               >
                 Set Availability
               </Button>
@@ -454,6 +495,7 @@ const DoctorDashboard = () => {
                 variant="outlined"
                 startIcon={<TrendingUpIcon />}
                 sx={{ py: 1.5 }}
+                onClick={() => handleNavigation('/reports')}
               >
                 View Reports
               </Button>
