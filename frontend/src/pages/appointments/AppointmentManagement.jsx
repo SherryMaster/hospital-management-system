@@ -550,13 +550,13 @@ const AppointmentManagement = () => {
                         }
                         secondary={
                           <Box>
-                            <Typography variant="body2" color="text.secondary">
+                            <Typography variant="body2" color="text.secondary" component="span" sx={{ display: 'block' }}>
                               {appointment.date} at {appointment.time} • {appointment.duration} min
                             </Typography>
-                            <Typography variant="body2" color="text.secondary">
+                            <Typography variant="body2" color="text.secondary" component="span" sx={{ display: 'block' }}>
                               {appointment.doctor} • {appointment.department}
                             </Typography>
-                            <Typography variant="body2" color="text.secondary">
+                            <Typography variant="body2" color="text.secondary" component="span" sx={{ display: 'block' }}>
                               {appointment.chiefComplaint}
                             </Typography>
                           </Box>
