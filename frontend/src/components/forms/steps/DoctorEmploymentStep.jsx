@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Grid,
@@ -13,8 +13,31 @@ import {
   Work,
   CalendarToday,
 } from '@mui/icons-material';
+import { departmentService } from '../../../services/api';
 
 const DoctorEmploymentStep = ({ formData, onChange, errors = {} }) => {
+  const [departments, setDepartments] = useState([]);
+  const [loadingDepartments, setLoadingDepartments] = useState(true);
+
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      try {
+        const { data, error } = await departmentService.getDepartments();
+        if (data && !error) {
+          setDepartments(data.results || data);
+        } else {
+          console.error('Failed to fetch departments:', error);
+        }
+      } catch (err) {
+        console.error('Error fetching departments:', err);
+      } finally {
+        setLoadingDepartments(false);
+      }
+    };
+
+    fetchDepartments();
+  }, []);
+
   const handleInputChange = (event) => {
     const { name, value } = event.target;
     onChange(name, value);
@@ -44,12 +67,15 @@ const DoctorEmploymentStep = ({ formData, onChange, errors = {} }) => {
         <Grid item xs={12} sm={6}>
           <TextField
             fullWidth
-            name="department_name"
+            select
+            name="department"
             label="Department"
-            value={formData.department_name || ''}
+            value={formData.department || ''}
             onChange={handleInputChange}
-            error={!!errors.department_name}
-            helperText={errors.department_name}
+            error={!!errors.department}
+            helperText={errors.department}
+            required
+            disabled={loadingDepartments}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -57,7 +83,16 @@ const DoctorEmploymentStep = ({ formData, onChange, errors = {} }) => {
                 </InputAdornment>
               ),
             }}
-          />
+          >
+            <MenuItem value="">
+              {loadingDepartments ? 'Loading departments...' : 'Select Department'}
+            </MenuItem>
+            {departments.map((dept) => (
+              <MenuItem key={dept.id} value={dept.id}>
+                {dept.name}
+              </MenuItem>
+            ))}
+          </TextField>
         </Grid>
 
         {/* Employment Status */}

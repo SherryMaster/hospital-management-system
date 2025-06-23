@@ -85,19 +85,29 @@ export const validateEmergencyContact = (formData) => {
 
 export const validateDoctorCredentials = (formData) => {
   const errors = {};
-  
+
   if (!formData.license_number?.trim()) {
     errors.license_number = 'Medical license number is required';
   }
-  
+
   if (!formData.medical_school?.trim()) {
     errors.medical_school = 'Medical school is required';
   }
-  
+
   if (!formData.graduation_year) {
     errors.graduation_year = 'Graduation year is required';
   }
-  
+
+  return errors;
+};
+
+export const validateDoctorEmployment = (formData) => {
+  const errors = {};
+
+  if (!formData.department) {
+    errors.department = 'Department is required';
+  }
+
   return errors;
 };
 
@@ -213,6 +223,7 @@ export const USER_FORM_CONFIGS = {
         label: 'Employment Details',
         subtitle: 'Department, specializations, and employment information',
         component: DoctorEmploymentStep,
+        validate: validateDoctorEmployment,
       },
       {
         label: 'Review & Confirm',
