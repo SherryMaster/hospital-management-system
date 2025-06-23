@@ -28,7 +28,6 @@ import {
   Tab,
   Avatar,
   Chip,
-  LinearProgress,
 } from '@mui/material';
 import {
   Person as PersonIcon,
@@ -43,6 +42,11 @@ import {
 import { MainLayout } from '../../components/layout';
 import { useAuth } from '../../contexts/AuthContext';
 import { patientService } from '../../services/api';
+import {
+  PatientPageHeader,
+  PatientLoadingState,
+  PatientErrorAlert
+} from './components';
 
 const PatientProfile = () => {
   const { user, logout } = useAuth();
@@ -274,15 +278,12 @@ const PatientProfile = () => {
   if (loading) {
     return (
       <MainLayout user={user} onLogout={logout}>
-        <Box>
-          <Typography variant="h4" gutterBottom>
-            Patient Profile
-          </Typography>
-          <LinearProgress sx={{ mb: 3 }} />
-          <Typography variant="body1" color="text.secondary">
-            Loading your profile information...
-          </Typography>
-        </Box>
+        <PatientLoadingState
+          type="linear"
+          title="Patient Profile"
+          showTitle={true}
+          message="Loading your profile information..."
+        />
       </MainLayout>
     );
   }
@@ -291,67 +292,34 @@ const PatientProfile = () => {
     <MainLayout user={user} onLogout={logout}>
       <Box>
         {/* Header */}
-        <Box sx={{ mb: 4 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Avatar 
-                sx={{ 
-                  width: 64, 
-                  height: 64, 
-                  bgcolor: 'primary.main',
-                  fontSize: '1.5rem'
-                }}
-              >
-                {profileData.first_name?.charAt(0)}{profileData.last_name?.charAt(0)}
-              </Avatar>
-              <Box>
-                <Typography variant="h4" component="h1">
-                  {`${profileData.first_name} ${profileData.middle_name ? profileData.middle_name + ' ' : ''}${profileData.last_name}`.trim() || 'Patient Profile'}
-                </Typography>
-                <Typography variant="body1" color="text.secondary">
-                  Manage your personal and medical information
-                </Typography>
-              </Box>
-            </Box>
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              {editMode ? (
-                <>
-                  <Button
-                    variant="contained"
-                    startIcon={<SaveIcon />}
-                    onClick={handleSave}
-                    disabled={saving}
-                  >
-                    {saving ? 'Saving...' : 'Save Changes'}
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    startIcon={<CancelIcon />}
-                    onClick={handleEditToggle}
-                    disabled={saving}
-                  >
-                    Cancel
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  variant="contained"
-                  startIcon={<EditIcon />}
-                  onClick={handleEditToggle}
-                >
-                  Edit Profile
-                </Button>
-              )}
-            </Box>
-          </Box>
-        </Box>
+        <PatientPageHeader
+          title="Patient Profile"
+          subtitle="Manage your personal and medical information"
+          user={user}
+          showAvatar={true}
+          patientProfile={profileData}
+          actionButton={editMode ? {
+            label: saving ? 'Saving...' : 'Save Changes',
+            icon: <SaveIcon />,
+            onClick: handleSave,
+            disabled: saving
+          } : {
+            label: 'Edit Profile',
+            icon: <EditIcon />,
+            onClick: handleEditToggle
+          }}
+          editAction={editMode ? {
+            label: 'Cancel',
+            onClick: handleEditToggle
+          } : null}
+        />
 
         {/* Alerts */}
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
-            {error}
-          </Alert>
-        )}
+        <PatientErrorAlert
+          error={error}
+          onClose={() => setError(null)}
+          title="Profile Error"
+        />
         {success && (
           <Alert severity="success" sx={{ mb: 3 }} onClose={() => setSuccess(null)}>
             {success}

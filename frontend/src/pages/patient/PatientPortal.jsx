@@ -61,6 +61,11 @@ import { MainLayout } from '../../components/layout';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { patientService, appointmentService, billingService, medicalRecordsService } from '../../services/api';
+import {
+  PatientPageHeader,
+  PatientLoadingState,
+  PatientErrorAlert
+} from './components';
 
 const PatientPortal = () => {
   const { user, logout } = useAuth();
@@ -514,14 +519,11 @@ const PatientPortal = () => {
   if (loading) {
     return (
       <MainLayout user={user} onLogout={logout}>
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-          <Box sx={{ textAlign: 'center' }}>
-            <CircularProgress sx={{ mb: 2 }} />
-            <Typography variant="body1" color="text.secondary">
-              Loading your health information...
-            </Typography>
-          </Box>
-        </Box>
+        <PatientLoadingState
+          type="circular"
+          message="Loading your health information..."
+          fullHeight={true}
+        />
       </MainLayout>
     );
   }
@@ -530,24 +532,19 @@ const PatientPortal = () => {
     <MainLayout user={user} onLogout={logout}>
       <Box>
         {/* Header */}
-        <Box sx={{ mb: 4 }}>
-          <Typography variant="h4" component="h1" gutterBottom>
-            Patient Portal
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Manage your health information and medical records
-          </Typography>
-        </Box>
+        <PatientPageHeader
+          title="Patient Portal"
+          subtitle="Manage your health information and medical records"
+          user={user}
+        />
 
         {/* Error Alert */}
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
-            {error}
-            <Button size="small" onClick={loadPatientData} sx={{ ml: 2 }}>
-              Retry
-            </Button>
-          </Alert>
-        )}
+        <PatientErrorAlert
+          error={error}
+          onClose={() => setError(null)}
+          onRetry={loadPatientData}
+          title="Failed to load patient data"
+        />
 
         {/* Tabs */}
         <Paper sx={{ mb: 3 }}>

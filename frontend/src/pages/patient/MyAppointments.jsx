@@ -18,7 +18,6 @@ import {
   TableRow,
   Paper,
   Chip,
-  IconButton,
   TextField,
   InputAdornment,
   MenuItem,
@@ -32,7 +31,6 @@ import {
   Grid,
   Divider,
   Avatar,
-  Tooltip,
   TablePagination,
 } from '@mui/material';
 import {
@@ -44,11 +42,19 @@ import {
   Edit as EditIcon,
   Visibility as ViewIcon,
   FilterList as FilterIcon,
+  Check as CheckIcon,
 } from '@mui/icons-material';
 import { MainLayout } from '../../components/layout';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { appointmentService } from '../../services/api';
+import {
+  PatientPageHeader,
+  PatientLoadingState,
+  PatientErrorAlert,
+  PatientSummaryCards,
+  PatientTableActions
+} from './components';
 
 const MyAppointments = () => {
   const { user, logout } = useAuth();
@@ -278,102 +284,71 @@ const MyAppointments = () => {
     <MainLayout user={user} onLogout={logout}>
       <Box>
         {/* Header */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Box>
-            <Typography variant="h4" component="h1" gutterBottom>
-              {user?.first_name ? `${user.first_name}'s Appointments` : 'My Appointments'}
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              View and manage your medical appointments
-            </Typography>
-            {appointments.length > 0 && (
-              <Typography variant="body2" color="primary.main" sx={{ mt: 1 }}>
-                You have {appointments.filter(apt =>
-                  new Date(apt.date) >= new Date() &&
-                  ['confirmed', 'pending'].includes(apt.status)
-                ).length} upcoming appointments
-              </Typography>
-            )}
-          </Box>
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button
-              variant="contained"
-              startIcon={<CalendarIcon />}
-              onClick={() => window.location.href = '/appointments/book'}
-            >
-              Book New
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={<RefreshIcon />}
-              onClick={loadAppointments}
-              disabled={loading}
-            >
-              Refresh
-            </Button>
-          </Box>
-        </Box>
+        <PatientPageHeader
+          title="My Appointments"
+          subtitle="View and manage your medical appointments"
+          user={user}
+          actionButton={{
+            label: 'Book New',
+            icon: <CalendarIcon />,
+            onClick: () => window.location.href = '/appointments/book'
+          }}
+          refreshAction={{
+            onClick: loadAppointments,
+            disabled: loading
+          }}
+          additionalInfo={appointments.length > 0 ?
+            `You have ${appointments.filter(apt =>
+              new Date(apt.date) >= new Date() &&
+              ['confirmed', 'pending'].includes(apt.status)
+            ).length} upcoming appointments` : null
+          }
+        />
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
-            {error}
-          </Alert>
-        )}
+        <PatientErrorAlert
+          error={error}
+          onClose={() => setError(null)}
+          onRetry={loadAppointments}
+          title="Failed to load appointments"
+        />
 
         {/* Summary Cards */}
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Typography color="textSecondary" gutterBottom>
-                  Total Appointments
-                </Typography>
-                <Typography variant="h4">
-                  {appointments.length}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Typography color="textSecondary" gutterBottom>
-                  Upcoming
-                </Typography>
-                <Typography variant="h4">
-                  {appointments.filter(apt => 
-                    new Date(apt.date) >= new Date() && 
-                    ['confirmed', 'pending'].includes(apt.status)
-                  ).length}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Typography color="textSecondary" gutterBottom>
-                  Completed
-                </Typography>
-                <Typography variant="h4">
-                  {appointments.filter(apt => apt.status === 'completed').length}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Typography color="textSecondary" gutterBottom>
-                  Cancelled
-                </Typography>
-                <Typography variant="h4">
-                  {appointments.filter(apt => apt.status === 'cancelled').length}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
+        <PatientSummaryCards
+          cards={[
+            {
+              id: 'total',
+              title: 'Total Appointments',
+              value: appointments.length,
+              icon: <CalendarIcon />,
+              color: 'primary'
+            },
+            {
+              id: 'upcoming',
+              title: 'Upcoming',
+              value: appointments.filter(apt =>
+                new Date(apt.date) >= new Date() &&
+                ['confirmed', 'pending'].includes(apt.status)
+              ).length,
+              icon: <CalendarIcon />,
+              color: 'info'
+            },
+            {
+              id: 'completed',
+              title: 'Completed',
+              value: appointments.filter(apt => apt.status === 'completed').length,
+              icon: <CheckIcon />,
+              color: 'success'
+            },
+            {
+              id: 'cancelled',
+              title: 'Cancelled',
+              value: appointments.filter(apt => apt.status === 'cancelled').length,
+              icon: <CancelIcon />,
+              color: 'error'
+            }
+          ]}
+          loading={loading}
+        />
 
         {/* Filters */}
         <Card sx={{ mb: 3 }}>
@@ -540,31 +515,33 @@ const MyAppointments = () => {
                         />
                       </TableCell>
                       <TableCell align="center">
-                        <Box sx={{ display: 'flex', gap: 0.5 }}>
-                          <Tooltip title="View Details">
-                            <IconButton size="small">
-                              <ViewIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          {appointment.canBeRescheduled && (
-                            <Tooltip title="Reschedule">
-                              <IconButton size="small">
-                                <EditIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                          {appointment.canBeCancelled && (
-                            <Tooltip title="Cancel">
-                              <IconButton
-                                size="small"
-                                color="error"
-                                onClick={() => handleCancelClick(appointment)}
-                              >
-                                <CancelIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                        </Box>
+                        <PatientTableActions
+                          actions={[
+                            {
+                              id: 'view',
+                              type: 'view',
+                              label: 'View Details',
+                              tooltip: 'View appointment details',
+                              onClick: () => console.log('View appointment', appointment.id)
+                            },
+                            {
+                              id: 'reschedule',
+                              type: 'edit',
+                              label: 'Reschedule',
+                              tooltip: 'Reschedule appointment',
+                              visible: appointment.canBeRescheduled,
+                              onClick: () => console.log('Reschedule appointment', appointment.id)
+                            },
+                            {
+                              id: 'cancel',
+                              type: 'cancel',
+                              label: 'Cancel',
+                              tooltip: 'Cancel appointment',
+                              visible: appointment.canBeCancelled,
+                              onClick: () => handleCancelClick(appointment)
+                            }
+                          ]}
+                        />
                       </TableCell>
                     </TableRow>
                   ))

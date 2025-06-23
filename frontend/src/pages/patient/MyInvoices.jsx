@@ -18,12 +18,9 @@ import {
   TableRow,
   Paper,
   Chip,
-  IconButton,
   TextField,
   InputAdornment,
   MenuItem,
-  CircularProgress,
-  Alert,
   Button,
   Dialog,
   DialogTitle,
@@ -34,7 +31,6 @@ import {
   List,
   ListItem,
   ListItemText,
-  Tooltip,
   TablePagination,
 } from '@mui/material';
 import {
@@ -51,6 +47,13 @@ import { MainLayout } from '../../components/layout';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { billingService } from '../../services/api';
+import {
+  PatientPageHeader,
+  PatientLoadingState,
+  PatientErrorAlert,
+  PatientSummaryCards,
+  PatientTableActions
+} from './components';
 
 const MyInvoices = () => {
   const { user, logout } = useAuth();
@@ -279,9 +282,11 @@ const MyInvoices = () => {
   if (loading && invoices.length === 0) {
     return (
       <MainLayout user={user} onLogout={logout}>
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
-          <CircularProgress />
-        </Box>
+        <PatientLoadingState
+          type="circular"
+          message="Loading your invoices..."
+          fullHeight={true}
+        />
       </MainLayout>
     );
   }
@@ -290,82 +295,57 @@ const MyInvoices = () => {
     <MainLayout user={user} onLogout={logout}>
       <Box>
         {/* Header */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Box>
-            <Typography variant="h4" component="h1" gutterBottom>
-              My Invoices
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              View and manage your medical bills and payments
-            </Typography>
-          </Box>
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={loadInvoices}
-            disabled={loading}
-          >
-            Refresh
-          </Button>
-        </Box>
+        <PatientPageHeader
+          title="My Invoices"
+          subtitle="View and manage your medical bills and payments"
+          user={user}
+          refreshAction={{
+            onClick: loadInvoices,
+            disabled: loading
+          }}
+        />
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
-            {error}
-          </Alert>
-        )}
+        <PatientErrorAlert
+          error={error}
+          onClose={() => setError(null)}
+          onRetry={loadInvoices}
+          title="Failed to load invoices"
+        />
 
         {/* Summary Cards */}
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Typography color="textSecondary" gutterBottom>
-                  Total Invoices
-                </Typography>
-                <Typography variant="h4">
-                  {invoices.length}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Typography color="textSecondary" gutterBottom>
-                  Total Amount
-                </Typography>
-                <Typography variant="h4">
-                  {formatCurrency(totalAmount)}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Typography color="textSecondary" gutterBottom>
-                  Outstanding
-                </Typography>
-                <Typography variant="h4" color="warning.main">
-                  {formatCurrency(outstandingAmount)}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Typography color="textSecondary" gutterBottom>
-                  Overdue
-                </Typography>
-                <Typography variant="h4" color="error.main">
-                  {overdueInvoices}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
+        <PatientSummaryCards
+          cards={[
+            {
+              id: 'total',
+              title: 'Total Invoices',
+              value: invoices.length,
+              icon: <ReceiptIcon />,
+              color: 'primary'
+            },
+            {
+              id: 'amount',
+              title: 'Total Amount',
+              value: formatCurrency(totalAmount),
+              icon: <PaymentIcon />,
+              color: 'info'
+            },
+            {
+              id: 'outstanding',
+              title: 'Outstanding',
+              value: formatCurrency(outstandingAmount),
+              icon: <ReceiptIcon />,
+              color: 'warning'
+            },
+            {
+              id: 'overdue',
+              title: 'Overdue',
+              value: overdueInvoices,
+              icon: <ReceiptIcon />,
+              color: 'error'
+            }
+          ]}
+          loading={loading}
+        />
 
         {/* Filters */}
         <Card sx={{ mb: 3 }}>
@@ -510,32 +490,32 @@ const MyInvoices = () => {
                         />
                       </TableCell>
                       <TableCell align="center">
-                        <Box sx={{ display: 'flex', gap: 0.5 }}>
-                          <Tooltip title="View Details">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleViewClick(invoice)}
-                            >
-                              <ViewIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Download">
-                            <IconButton size="small">
-                              <DownloadIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          {invoice.balanceDue > 0 && (
-                            <Tooltip title="Make Payment">
-                              <IconButton
-                                size="small"
-                                color="primary"
-                                onClick={() => handlePaymentClick(invoice)}
-                              >
-                                <PaymentIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                        </Box>
+                        <PatientTableActions
+                          actions={[
+                            {
+                              id: 'view',
+                              type: 'view',
+                              label: 'View Details',
+                              tooltip: 'View invoice details',
+                              onClick: () => handleViewClick(invoice)
+                            },
+                            {
+                              id: 'download',
+                              type: 'download',
+                              label: 'Download',
+                              tooltip: 'Download invoice',
+                              onClick: () => console.log('Download invoice', invoice.id)
+                            },
+                            {
+                              id: 'payment',
+                              type: 'payment',
+                              label: 'Make Payment',
+                              tooltip: 'Make payment',
+                              visible: invoice.balanceDue > 0,
+                              onClick: () => handlePaymentClick(invoice)
+                            }
+                          ]}
+                        />
                       </TableCell>
                     </TableRow>
                   ))

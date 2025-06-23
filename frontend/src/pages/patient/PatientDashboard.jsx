@@ -20,10 +20,8 @@ import {
   ListItemAvatar,
   ListItemText,
   Divider,
-  LinearProgress,
   Paper,
   Alert,
-
 } from '@mui/material';
 import {
   CalendarToday as CalendarIcon,
@@ -35,15 +33,19 @@ import {
   History as HistoryIcon,
   MedicalServices as MedicalIcon,
   Medication as MedicationIcon,
-  Phone as PhoneIcon,
-  VideoCall as VideoCallIcon,
   Download as DownloadIcon,
-  Payment as PaymentIcon,
   ContactPhone as ContactPhoneIcon,
 } from '@mui/icons-material';
 import { MainLayout } from '../../components/layout';
 import { useAuth } from '../../contexts/AuthContext';
 import { patientService, appointmentService, billingService } from '../../services/api';
+import {
+  PatientPageHeader,
+  PatientLoadingState,
+  PatientErrorAlert,
+  PatientSummaryCards,
+  PatientQuickActions
+} from './components';
 
 const PatientDashboard = () => {
   const { user, logout } = useAuth();
@@ -349,53 +351,17 @@ const PatientDashboard = () => {
     }
   };
 
-  const StatCard = ({ title, value, icon, color, action }) => (
-    <Card sx={{ height: '100%' }}>
-      <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <Box 
-            sx={{ 
-              p: 1, 
-              borderRadius: 1, 
-              bgcolor: `${color}.light`,
-              color: `${color}.main`,
-              mr: 2,
-            }}
-          >
-            {icon}
-          </Box>
-          <Box>
-            <Typography variant="h4" component="div" color={`${color}.main`}>
-              {value}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {title}
-            </Typography>
-          </Box>
-        </Box>
-      </CardContent>
-      {action && (
-        <CardActions>
-          <Button size="small" color={color}>
-            {action}
-          </Button>
-        </CardActions>
-      )}
-    </Card>
-  );
+
 
   if (loading) {
     return (
       <MainLayout user={user} onLogout={logout}>
-        <Box>
-          <Typography variant="h4" gutterBottom>
-            Patient Dashboard
-          </Typography>
-          <LinearProgress sx={{ mb: 3 }} />
-          <Typography variant="body1" color="text.secondary">
-            Loading your health information...
-          </Typography>
-        </Box>
+        <PatientLoadingState
+          type="linear"
+          title="Patient Dashboard"
+          showTitle={true}
+          message="Loading your health information..."
+        />
       </MainLayout>
     );
   }
@@ -404,41 +370,23 @@ const PatientDashboard = () => {
     <MainLayout user={user} onLogout={logout}>
       <Box>
         {/* Header */}
-        <Box sx={{ mb: 4 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-            <Avatar
-              sx={{
-                width: 64,
-                height: 64,
-                bgcolor: 'primary.main',
-                fontSize: '1.5rem'
-              }}
-            >
-              {dashboardData.patientProfile.first_name?.charAt(0)}{dashboardData.patientProfile.last_name?.charAt(0)}
-            </Avatar>
-            <Box>
-              <Typography variant="h4" component="h1" gutterBottom>
-                Welcome back, {dashboardData.patientProfile.first_name || user?.first_name || user?.full_name?.split(' ')[0] || 'Patient'}!
-              </Typography>
-              <Typography variant="body1" color="text.secondary">
-                Patient ID: {dashboardData.patientProfile.patient_id || 'Loading...'}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Manage your health appointments and medical records
-              </Typography>
-            </Box>
-          </Box>
-        </Box>
+        <PatientPageHeader
+          title="Patient Dashboard"
+          subtitle="Manage your health appointments and medical records"
+          user={user}
+          showAvatar={true}
+          showPatientId={true}
+          showPersonalizedWelcome={true}
+          patientProfile={dashboardData.patientProfile}
+        />
 
         {/* Error Alert */}
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
-            {error}
-            <Button size="small" onClick={loadDashboardData} sx={{ ml: 2 }}>
-              Retry
-            </Button>
-          </Alert>
-        )}
+        <PatientErrorAlert
+          error={error}
+          onClose={() => setError(null)}
+          onRetry={loadDashboardData}
+          title="Failed to load dashboard data"
+        />
 
         {/* Patient Profile Overview */}
         <Grid container spacing={3} sx={{ mb: 4 }}>
@@ -684,44 +632,55 @@ const PatientDashboard = () => {
         )}
 
         {/* Quick Stats */}
-        <Grid container spacing={3} sx={{ mb: 4 }}>
-          <Grid item xs={12} sm={6} md={3}>
-            <StatCard
-              title="Upcoming Appointments"
-              value={dashboardData.upcomingAppointments.length}
-              icon={<CalendarIcon />}
-              color="primary"
-              action="Book New"
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <StatCard
-              title="Medical Records"
-              value={dashboardData.medicalHistory.length}
-              icon={<AssignmentIcon />}
-              color="info"
-              action="View All"
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <StatCard
-              title="Pending Invoices"
-              value={dashboardData.pendingInvoices.length}
-              icon={<ReceiptIcon />}
-              color="warning"
-              action="Pay Now"
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <StatCard
-              title="Health Summary"
-              value="Updated"
-              icon={<HospitalIcon />}
-              color="success"
-              action="View Details"
-            />
-          </Grid>
-        </Grid>
+        <PatientSummaryCards
+          cards={[
+            {
+              id: 'appointments',
+              title: 'Upcoming Appointments',
+              value: dashboardData.upcomingAppointments.length,
+              icon: <CalendarIcon />,
+              color: 'primary',
+              action: {
+                label: 'Book New',
+                onClick: () => window.location.href = '/appointments/book'
+              }
+            },
+            {
+              id: 'records',
+              title: 'Medical Records',
+              value: dashboardData.medicalHistory.length,
+              icon: <AssignmentIcon />,
+              color: 'info',
+              action: {
+                label: 'View All',
+                onClick: () => window.location.href = '/patient/portal'
+              }
+            },
+            {
+              id: 'invoices',
+              title: 'Pending Invoices',
+              value: dashboardData.pendingInvoices.length,
+              icon: <ReceiptIcon />,
+              color: 'warning',
+              action: {
+                label: 'Pay Now',
+                onClick: () => window.location.href = '/my-invoices'
+              }
+            },
+            {
+              id: 'health',
+              title: 'Health Summary',
+              value: 'Updated',
+              icon: <HospitalIcon />,
+              color: 'success',
+              action: {
+                label: 'View Details',
+                onClick: () => window.location.href = '/patient/portal'
+              }
+            }
+          ]}
+          loading={loading}
+        />
 
         {/* Pending Invoices Alert */}
         {dashboardData.pendingInvoices.length > 0 && (
@@ -947,58 +906,39 @@ const PatientDashboard = () => {
         </Grid>
 
         {/* Quick Actions */}
-        <Paper sx={{ p: 3, mt: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            Quick Actions
-          </Typography>
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6} md={3}>
-              <Button
-                fullWidth
-                variant="contained"
-                startIcon={<AddIcon />}
-                sx={{ py: 1.5 }}
-                onClick={() => window.location.href = '/appointments/book'}
-              >
-                Book Appointment
-              </Button>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Button
-                fullWidth
-                variant="outlined"
-                startIcon={<AssignmentIcon />}
-                sx={{ py: 1.5 }}
-                onClick={() => window.location.href = '/patient/portal'}
-              >
-                View Records
-              </Button>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Button
-                fullWidth
-                variant="outlined"
-                startIcon={<ReceiptIcon />}
-                sx={{ py: 1.5 }}
-                onClick={() => window.location.href = '/my-invoices'}
-                color={dashboardData.pendingInvoices.length > 0 ? 'warning' : 'primary'}
-              >
-                {dashboardData.pendingInvoices.length > 0 ? 'Pay Bills' : 'View Bills'}
-              </Button>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Button
-                fullWidth
-                variant="outlined"
-                startIcon={<PersonIcon />}
-                sx={{ py: 1.5 }}
-                onClick={() => window.location.href = '/patient/profile'}
-              >
-                Update Profile
-              </Button>
-            </Grid>
-          </Grid>
-        </Paper>
+        <PatientQuickActions
+          actions={[
+            {
+              id: 'book-appointment',
+              label: 'Book Appointment',
+              icon: <AddIcon />,
+              variant: 'contained',
+              href: '/appointments/book'
+            },
+            {
+              id: 'view-records',
+              label: 'View Records',
+              icon: <AssignmentIcon />,
+              variant: 'outlined',
+              href: '/patient/portal'
+            },
+            {
+              id: 'view-invoices',
+              label: dashboardData.pendingInvoices.length > 0 ? 'Pay Bills' : 'View Bills',
+              icon: <ReceiptIcon />,
+              variant: 'outlined',
+              href: '/my-invoices',
+              color: dashboardData.pendingInvoices.length > 0 ? 'warning' : 'primary'
+            },
+            {
+              id: 'update-profile',
+              label: 'Update Profile',
+              icon: <PersonIcon />,
+              variant: 'outlined',
+              href: '/patient/profile'
+            }
+          ]}
+        />
 
         {/* Personalized Recommendations */}
         {(dashboardData.patientProfile.chronic_conditions ||
