@@ -13,9 +13,9 @@ except ImportError:
     Patient = None
 
 try:
-    from apps.doctors.models import Doctor, Department
+    from apps.doctors.models import Doctor, Department, Specialization
 except ImportError:
-    Doctor = Department = None
+    Doctor = Department = Specialization = None
 
 try:
     from apps.staff.models import Nurse, Administrator, Receptionist, Pharmacist
@@ -919,7 +919,7 @@ class AdminUserCreateSerializer(serializers.ModelSerializer):
         )
 
         # Handle specializations
-        if doctor_fields.get('specializations'):
+        if doctor_fields.get('specializations') and Specialization:
             for spec_name in doctor_fields['specializations']:
                 specialization, _ = Specialization.objects.get_or_create(name=spec_name)
                 doctor.specializations.add(specialization)
