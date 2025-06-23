@@ -390,6 +390,15 @@ export const appointmentService = {
       return { data: null, error: handleApiError(error) };
     }
   },
+
+  getMyAppointments: async (params = {}) => {
+    try {
+      const response = await api.get('/appointments/my/', { params });
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
 };
 
 export const patientService = {
@@ -649,6 +658,15 @@ export const billingService = {
   payInvoice: async (invoiceId, paymentData) => {
     try {
       const response = await api.post(`/billing/invoices/${invoiceId}/pay/`, paymentData);
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
+  getMyInvoices: async (params = {}) => {
+    try {
+      const response = await api.get('/billing/my-invoices/', { params });
       return { data: response.data, error: null };
     } catch (error) {
       return { data: null, error: handleApiError(error) };

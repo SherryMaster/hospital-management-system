@@ -39,6 +39,7 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  CircularProgress,
 } from '@mui/material';
 import {
   Person as PersonIcon,
@@ -58,122 +59,34 @@ import {
 } from '@mui/icons-material';
 import { MainLayout } from '../../components/layout';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotification } from '../../contexts/NotificationContext';
+import { patientService, appointmentService, billingService, medicalRecordsService } from '../../services/api';
 
 const PatientPortal = () => {
   const { user, logout } = useAuth();
+  const { showNotification } = useNotification();
   const [activeTab, setActiveTab] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [patientData, setPatientData] = useState({
     profile: {
-      firstName: 'John',
-      lastName: 'Doe',
-      email: 'john.doe@example.com',
-      phone: '+1 (555) 123-4567',
-      dateOfBirth: '1985-06-15',
-      gender: 'Male',
-      address: '123 Main St, City, State 12345',
-      emergencyContact: 'Jane Doe - +1 (555) 987-6543',
-      bloodType: 'O+',
-      allergies: ['Penicillin', 'Shellfish'],
-      chronicConditions: ['Hypertension'],
+      firstName: '',
+      lastName: '',
+      email: '',
+      phone: '',
+      dateOfBirth: '',
+      gender: '',
+      address: '',
+      emergencyContact: '',
+      bloodType: '',
+      allergies: [],
+      chronicConditions: [],
     },
-    medicalRecords: [
-      {
-        id: 1,
-        date: '2024-01-15',
-        doctor: 'Dr. Smith',
-        department: 'Cardiology',
-        diagnosis: 'Hypertension monitoring',
-        treatment: 'Blood pressure medication adjustment',
-        notes: 'Patient responding well to treatment. Continue current medication.',
-        vitals: {
-          bloodPressure: '130/85',
-          heartRate: '72 bpm',
-          temperature: '98.6°F',
-          weight: '175 lbs',
-        },
-        prescriptions: [
-          { medication: 'Lisinopril', dosage: '10mg', frequency: 'Once daily' },
-          { medication: 'Metformin', dosage: '500mg', frequency: 'Twice daily' },
-        ],
-      },
-      {
-        id: 2,
-        date: '2024-01-10',
-        doctor: 'Dr. Johnson',
-        department: 'General Medicine',
-        diagnosis: 'Annual physical examination',
-        treatment: 'Routine checkup and blood work',
-        notes: 'Overall health is good. Recommended lifestyle modifications.',
-        vitals: {
-          bloodPressure: '125/80',
-          heartRate: '68 bpm',
-          temperature: '98.4°F',
-          weight: '173 lbs',
-        },
-        prescriptions: [],
-      },
-    ],
-    appointments: [
-      {
-        id: 1,
-        date: '2024-02-01',
-        time: '10:00 AM',
-        doctor: 'Dr. Smith',
-        department: 'Cardiology',
-        type: 'Follow-up',
-        status: 'confirmed',
-        notes: 'Blood pressure check',
-      },
-      {
-        id: 2,
-        date: '2024-01-15',
-        time: '09:00 AM',
-        doctor: 'Dr. Smith',
-        department: 'Cardiology',
-        type: 'Consultation',
-        status: 'completed',
-        notes: 'Hypertension monitoring',
-      },
-      {
-        id: 3,
-        date: '2024-01-10',
-        time: '11:30 AM',
-        doctor: 'Dr. Johnson',
-        department: 'General Medicine',
-        type: 'Check-up',
-        status: 'completed',
-        notes: 'Annual physical examination',
-      },
-    ],
-    invoices: [
-      {
-        id: 1,
-        date: '2024-01-15',
-        amount: 250.00,
-        description: 'Cardiology consultation',
-        status: 'paid',
-        doctor: 'Dr. Smith',
-      },
-      {
-        id: 2,
-        date: '2024-01-10',
-        amount: 180.00,
-        description: 'Annual physical examination',
-        status: 'paid',
-        doctor: 'Dr. Johnson',
-      },
-      {
-        id: 3,
-        date: '2024-02-01',
-        amount: 200.00,
-        description: 'Follow-up consultation',
-        status: 'pending',
-        doctor: 'Dr. Smith',
-      },
-    ],
+    medicalRecords: [],
+    appointments: [],
+    invoices: [],
   });
 
   const tabLabels = ['Profile', 'Medical Records', 'Appointments', 'Billing'];
@@ -184,12 +97,100 @@ const PatientPortal = () => {
 
   const loadPatientData = async () => {
     setLoading(true);
+    setError(null);
+
     try {
-      // TODO: Replace with actual API call
-      // Data is already set in state for demo
-      console.log('Loading patient data...');
+      // Fetch patient profile, appointments, medical records, and invoices in parallel
+      const [profileResult, appointmentsResult, medicalRecordsResult, invoicesResult] = await Promise.all([
+        patientService.getMyProfile(),
+        appointmentService.getAppointments({ page_size: 50 }),
+        medicalRecordsService.getMedicalRecords({ page_size: 50 }),
+        billingService.getMyInvoices({ page_size: 50 })
+      ]);
+
+      // Process profile data
+      let profileData = {
+        firstName: '',
+        lastName: '',
+        email: '',
+        phone: '',
+        dateOfBirth: '',
+        gender: '',
+        address: '',
+        emergencyContact: '',
+        bloodType: '',
+        allergies: [],
+        chronicConditions: [],
+      };
+
+      if (profileResult.data) {
+        const profile = profileResult.data;
+        profileData = {
+          firstName: profile.user?.first_name || user?.first_name || '',
+          lastName: profile.user?.last_name || user?.last_name || '',
+          email: profile.user?.email || user?.email || '',
+          phone: profile.phone_number || '',
+          dateOfBirth: profile.date_of_birth || '',
+          gender: profile.gender || '',
+          address: profile.address || '',
+          emergencyContact: profile.emergency_contact || '',
+          bloodType: profile.blood_type || '',
+          allergies: profile.allergies ? profile.allergies.split(',').map(a => a.trim()).filter(a => a) : [],
+          chronicConditions: profile.chronic_conditions ? profile.chronic_conditions.split(',').map(c => c.trim()).filter(c => c) : [],
+        };
+      }
+
+      // Process appointments data
+      const appointments = (appointmentsResult.data?.results || []).map(apt => ({
+        id: apt.id,
+        date: apt.appointment_date,
+        time: apt.appointment_time,
+        doctor: apt.doctor?.user?.full_name || apt.doctor?.full_name || 'Unknown Doctor',
+        department: apt.department?.name || apt.doctor?.department?.name || 'Unknown Department',
+        type: apt.appointment_type || 'consultation',
+        status: apt.status,
+        notes: apt.notes || apt.chief_complaint || '',
+      }));
+
+      // Process medical records data
+      const medicalRecords = (medicalRecordsResult.data?.results || []).map(record => ({
+        id: record.id,
+        date: record.visit_date || record.created_at,
+        doctor: record.doctor?.user?.full_name || record.doctor?.full_name || 'Unknown Doctor',
+        department: record.doctor?.department?.name || 'Unknown Department',
+        diagnosis: record.diagnosis || record.chief_complaint || 'No diagnosis recorded',
+        treatment: record.treatment || record.treatment_plan || 'No treatment recorded',
+        notes: record.notes || 'No notes available',
+        vitals: {
+          bloodPressure: record.blood_pressure || 'N/A',
+          heartRate: record.heart_rate || 'N/A',
+          temperature: record.temperature || 'N/A',
+          weight: record.weight || 'N/A',
+        },
+        prescriptions: record.prescriptions ? JSON.parse(record.prescriptions) : [],
+      }));
+
+      // Process invoices data
+      const invoices = (invoicesResult.data?.results || []).map(invoice => ({
+        id: invoice.id,
+        date: invoice.issue_date || invoice.created_at,
+        amount: parseFloat(invoice.total_amount || 0),
+        description: invoice.description || `Invoice #${invoice.invoice_number}`,
+        status: invoice.status,
+        doctor: invoice.appointment?.doctor?.user?.full_name || 'Unknown Doctor',
+      }));
+
+      setPatientData({
+        profile: profileData,
+        medicalRecords,
+        appointments,
+        invoices,
+      });
+
     } catch (error) {
       console.error('Error loading patient data:', error);
+      setError('Failed to load patient data. Please try again.');
+      showNotification('Failed to load patient data', 'error');
     } finally {
       setLoading(false);
     }
@@ -453,11 +454,17 @@ const PatientPortal = () => {
     </TableContainer>
   );
 
-  const renderBillingTab = () => (
-    <Box>
-      <Alert severity="info" sx={{ mb: 3 }}>
-        You have 1 pending invoice totaling $200.00
-      </Alert>
+  const renderBillingTab = () => {
+    const pendingInvoices = patientData.invoices.filter(invoice => invoice.status === 'pending' || invoice.status === 'overdue');
+    const totalPending = pendingInvoices.reduce((sum, invoice) => sum + invoice.amount, 0);
+
+    return (
+      <Box>
+        {pendingInvoices.length > 0 && (
+          <Alert severity="warning" sx={{ mb: 3 }}>
+            You have {pendingInvoices.length} pending invoice{pendingInvoices.length > 1 ? 's' : ''} totaling ${totalPending.toFixed(2)}
+          </Alert>
+        )}
       
       <TableContainer component={Paper}>
         <Table>
@@ -501,7 +508,23 @@ const PatientPortal = () => {
         </Table>
       </TableContainer>
     </Box>
-  );
+    );
+  };
+
+  if (loading) {
+    return (
+      <MainLayout user={user} onLogout={logout}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+          <Box sx={{ textAlign: 'center' }}>
+            <CircularProgress sx={{ mb: 2 }} />
+            <Typography variant="body1" color="text.secondary">
+              Loading your health information...
+            </Typography>
+          </Box>
+        </Box>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout user={user} onLogout={logout}>
@@ -515,6 +538,16 @@ const PatientPortal = () => {
             Manage your health information and medical records
           </Typography>
         </Box>
+
+        {/* Error Alert */}
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+            {error}
+            <Button size="small" onClick={loadPatientData} sx={{ ml: 2 }}>
+              Retry
+            </Button>
+          </Alert>
+        )}
 
         {/* Tabs */}
         <Paper sx={{ mb: 3 }}>

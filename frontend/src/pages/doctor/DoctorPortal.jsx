@@ -45,6 +45,7 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  CircularProgress,
 } from '@mui/material';
 import {
   Person as PersonIcon,
@@ -66,119 +67,22 @@ import {
 import { TimePicker } from '@mui/x-date-pickers/TimePicker';
 import { MainLayout } from '../../components/layout';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotification } from '../../contexts/NotificationContext';
+import { doctorService, appointmentService, patientService } from '../../services/api';
 
 const DoctorPortal = () => {
   const { user, logout } = useAuth();
+  const { showNotification } = useNotification();
   const [activeTab, setActiveTab] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [patientDialogOpen, setPatientDialogOpen] = useState(false);
   const [availabilityDialogOpen, setAvailabilityDialogOpen] = useState(false);
   const [doctorData, setDoctorData] = useState({
-    patients: [
-      {
-        id: 1,
-        name: 'John Doe',
-        age: 38,
-        gender: 'Male',
-        phone: '+1 (555) 123-4567',
-        email: 'john.doe@example.com',
-        lastVisit: '2024-01-15',
-        nextAppointment: '2024-02-01',
-        condition: 'Hypertension',
-        status: 'active',
-        bloodType: 'O+',
-        allergies: ['Penicillin'],
-        medicalHistory: [
-          {
-            date: '2024-01-15',
-            diagnosis: 'Hypertension monitoring',
-            treatment: 'Blood pressure medication adjustment',
-            notes: 'Patient responding well to treatment.',
-          },
-          {
-            date: '2024-01-10',
-            diagnosis: 'Annual physical examination',
-            treatment: 'Routine checkup and blood work',
-            notes: 'Overall health is good.',
-          },
-        ],
-      },
-      {
-        id: 2,
-        name: 'Jane Smith',
-        age: 45,
-        gender: 'Female',
-        phone: '+1 (555) 987-6543',
-        email: 'jane.smith@example.com',
-        lastVisit: '2024-01-12',
-        nextAppointment: '2024-01-28',
-        condition: 'Diabetes Type 2',
-        status: 'active',
-        bloodType: 'A+',
-        allergies: ['Shellfish'],
-        medicalHistory: [
-          {
-            date: '2024-01-12',
-            diagnosis: 'Diabetes management',
-            treatment: 'Insulin dosage adjustment',
-            notes: 'Blood sugar levels improving.',
-          },
-        ],
-      },
-      {
-        id: 3,
-        name: 'Mike Johnson',
-        age: 29,
-        gender: 'Male',
-        phone: '+1 (555) 456-7890',
-        email: 'mike.johnson@example.com',
-        lastVisit: '2024-01-08',
-        nextAppointment: null,
-        condition: 'Sports Injury',
-        status: 'recovered',
-        bloodType: 'B+',
-        allergies: [],
-        medicalHistory: [
-          {
-            date: '2024-01-08',
-            diagnosis: 'Knee ligament strain',
-            treatment: 'Physical therapy and rest',
-            notes: 'Full recovery expected in 4-6 weeks.',
-          },
-        ],
-      },
-    ],
-    schedule: [
-      {
-        id: 1,
-        date: '2024-01-25',
-        time: '09:00 AM',
-        patient: 'John Doe',
-        type: 'Follow-up',
-        duration: 30,
-        status: 'confirmed',
-      },
-      {
-        id: 2,
-        date: '2024-01-25',
-        time: '10:30 AM',
-        patient: 'Sarah Wilson',
-        type: 'Consultation',
-        duration: 45,
-        status: 'confirmed',
-      },
-      {
-        id: 3,
-        date: '2024-01-26',
-        time: '02:00 PM',
-        patient: 'Mike Brown',
-        type: 'Check-up',
-        duration: 30,
-        status: 'pending',
-      },
-    ],
+    patients: [],
+    schedule: [],
     availability: {
       monday: { enabled: true, startTime: '09:00', endTime: '17:00' },
       tuesday: { enabled: true, startTime: '09:00', endTime: '17:00' },
@@ -189,12 +93,12 @@ const DoctorPortal = () => {
       sunday: { enabled: false, startTime: '09:00', endTime: '13:00' },
     },
     profile: {
-      name: 'Dr. John Smith',
-      specialization: 'Cardiology',
-      experience: '15 years',
-      education: 'MD from Harvard Medical School',
-      certifications: ['Board Certified Cardiologist', 'ACLS Certified'],
-      consultationFee: 200,
+      name: '',
+      specialization: '',
+      experience: '',
+      education: '',
+      certifications: [],
+      consultationFee: 0,
     },
   });
 
@@ -206,11 +110,94 @@ const DoctorPortal = () => {
 
   const loadDoctorData = async () => {
     setLoading(true);
+    setError(null);
+
     try {
-      // TODO: Replace with actual API call
-      console.log('Loading doctor data...');
+      // Fetch doctor profile, patients, and appointments in parallel
+      const [profileResult, patientsResult, appointmentsResult] = await Promise.all([
+        doctorService.getMyProfile(),
+        patientService.getPatients({ doctor: user?.id, page_size: 50 }),
+        appointmentService.getAppointments({ doctor: user?.id, page_size: 50 })
+      ]);
+
+      // Process profile data
+      let profileData = {
+        name: '',
+        specialization: '',
+        experience: '',
+        education: '',
+        certifications: [],
+        consultationFee: 0,
+      };
+
+      if (profileResult.data) {
+        const profile = profileResult.data;
+        profileData = {
+          name: `Dr. ${profile.user?.full_name || `${profile.user?.first_name} ${profile.user?.last_name}`.trim()}`,
+          specialization: profile.specializations?.[0]?.name || profile.department?.name || 'General Medicine',
+          experience: profile.years_of_experience ? `${profile.years_of_experience} years` : 'Not specified',
+          education: profile.education || 'Not specified',
+          certifications: profile.certifications ? profile.certifications.split(',').map(c => c.trim()).filter(c => c) : [],
+          consultationFee: parseFloat(profile.consultation_fee || 0),
+        };
+      }
+
+      // Process patients data
+      const patients = (patientsResult.data?.results || []).map(patient => {
+        // Calculate age from date of birth
+        const age = patient.date_of_birth ?
+          new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear() :
+          'Unknown';
+
+        // Find the most recent appointment for this patient
+        const patientAppointments = (appointmentsResult.data?.results || [])
+          .filter(apt => apt.patient?.id === patient.id)
+          .sort((a, b) => new Date(b.appointment_date) - new Date(a.appointment_date));
+
+        const lastVisit = patientAppointments.find(apt => apt.status === 'completed')?.appointment_date;
+        const nextAppointment = patientAppointments.find(apt =>
+          apt.status === 'confirmed' || apt.status === 'scheduled'
+        )?.appointment_date;
+
+        return {
+          id: patient.id,
+          name: patient.user?.full_name || `${patient.user?.first_name} ${patient.user?.last_name}`.trim(),
+          age: age,
+          gender: patient.gender || 'Not specified',
+          phone: patient.phone_number || patient.user?.phone || 'Not provided',
+          email: patient.user?.email || 'Not provided',
+          lastVisit: lastVisit || 'No previous visits',
+          nextAppointment: nextAppointment || null,
+          condition: patient.chronic_conditions || 'No conditions noted',
+          status: patient.is_active ? 'active' : 'inactive',
+          bloodType: patient.blood_type || 'Unknown',
+          allergies: patient.allergies ? patient.allergies.split(',').map(a => a.trim()).filter(a => a) : [],
+          medicalHistory: [], // This would need a separate API call for detailed medical history
+        };
+      });
+
+      // Process schedule/appointments data
+      const schedule = (appointmentsResult.data?.results || []).map(apt => ({
+        id: apt.id,
+        date: apt.appointment_date,
+        time: apt.appointment_time,
+        patient: apt.patient?.user?.full_name || apt.patient?.full_name || 'Unknown Patient',
+        type: apt.appointment_type || 'consultation',
+        duration: 30, // Default duration, could be from appointment data
+        status: apt.status,
+      }));
+
+      setDoctorData(prev => ({
+        ...prev,
+        patients,
+        schedule,
+        profile: profileData,
+      }));
+
     } catch (error) {
       console.error('Error loading doctor data:', error);
+      setError('Failed to load doctor data. Please try again.');
+      showNotification('Failed to load doctor data', 'error');
     } finally {
       setLoading(false);
     }
@@ -491,6 +478,21 @@ const DoctorPortal = () => {
     </Grid>
   );
 
+  if (loading) {
+    return (
+      <MainLayout user={user} onLogout={logout}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+          <Box sx={{ textAlign: 'center' }}>
+            <CircularProgress sx={{ mb: 2 }} />
+            <Typography variant="body1" color="text.secondary">
+              Loading your practice information...
+            </Typography>
+          </Box>
+        </Box>
+      </MainLayout>
+    );
+  }
+
   return (
     <MainLayout user={user} onLogout={logout}>
       <Box>
@@ -503,6 +505,16 @@ const DoctorPortal = () => {
             Manage your patients, schedule, and availability
           </Typography>
         </Box>
+
+        {/* Error Alert */}
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+            {error}
+            <Button size="small" onClick={loadDoctorData} sx={{ ml: 2 }}>
+              Retry
+            </Button>
+          </Alert>
+        )}
 
         {/* Tabs */}
         <Paper sx={{ mb: 3 }}>

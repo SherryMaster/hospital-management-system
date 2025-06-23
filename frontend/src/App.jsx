@@ -26,7 +26,7 @@ import RegisterPage from './pages/auth/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 import { AppointmentBooking, AppointmentCalendar, AppointmentManagement } from './pages/appointments';
-import { PatientPortal } from './pages/patient';
+import { PatientPortal, MyAppointments, MyInvoices } from './pages/patient';
 import { DoctorPortal } from './pages/doctor';
 import UsersPage from './pages/admin/UsersPage';
 import PatientsPage from './pages/PatientsPage';
@@ -130,6 +130,22 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute requiredRoles={['doctor']}>
             <DoctorPortal />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/my-appointments"
+        element={
+          <ProtectedRoute requiredRoles={['patient']}>
+            <MyAppointments />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/my-invoices"
+        element={
+          <ProtectedRoute requiredRoles={['patient']}>
+            <MyInvoices />
           </ProtectedRoute>
         }
       />
