@@ -196,7 +196,7 @@ const PatientsPage = () => {
                 <MenuItem value="patient_id">Patient ID</MenuItem>
                 <MenuItem value="user__date_of_birth">Age</MenuItem>
                 <MenuItem value="last_visit_date">Last Visit</MenuItem>
-                <MenuItem value="created_at">Registration Date</MenuItem>
+                <MenuItem value="registration_date">Registration Date</MenuItem>
               </TextField>
               <Button variant="contained" onClick={handleSearch}>
                 Search
@@ -238,15 +238,25 @@ const PatientsPage = () => {
                       <TableRow key={patient.id}>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <Avatar sx={{ bgcolor: 'primary.main' }}>
-                              <PersonIcon />
+                            <Avatar
+                              src={patient.profile_picture || undefined}
+                              sx={{ bgcolor: 'primary.main' }}
+                              onError={(e) => {
+                                e.target.src = '';
+                              }}
+                            >
+                              {patient.profile_picture ? null : (
+                                patient.full_name ?
+                                  patient.full_name.charAt(0).toUpperCase() :
+                                  <PersonIcon />
+                              )}
                             </Avatar>
                             <Box>
                               <Typography variant="body2" fontWeight="medium">
-                                {patient.user?.full_name || `${patient.user?.first_name} ${patient.user?.last_name}`.trim()}
+                                {patient.full_name || 'Unknown Name'}
                               </Typography>
                               <Typography variant="caption" color="text.secondary">
-                                {patient.user?.email}
+                                {patient.email || 'No email'}
                               </Typography>
                             </Box>
                           </Box>
@@ -257,7 +267,7 @@ const PatientsPage = () => {
                           </Typography>
                         </TableCell>
                         <TableCell>
-                          {patient.age || calculateAge(patient.user?.date_of_birth)}
+                          {patient.age || 'N/A'}
                         </TableCell>
                         <TableCell>
                           <Chip
@@ -267,7 +277,7 @@ const PatientsPage = () => {
                             variant="outlined"
                           />
                         </TableCell>
-                        <TableCell>{patient.user?.phone_number || 'N/A'}</TableCell>
+                        <TableCell>{patient.phone || 'N/A'}</TableCell>
                         <TableCell>
                           {patient.last_visit_date ? formatDate(patient.last_visit_date) : 'Never'}
                         </TableCell>

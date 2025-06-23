@@ -90,12 +90,13 @@ class PatientListSerializer(serializers.ModelSerializer):
     age = serializers.ReadOnlyField()
     email = serializers.ReadOnlyField(source='user.email')
     phone = PhoneNumberField(source='user.phone_number', read_only=True)
-    
+    profile_picture = serializers.ImageField(source='user.profile_picture', read_only=True)
+
     class Meta:
         model = Patient
         fields = [
             'id', 'patient_id', 'full_name', 'age', 'email', 'phone',
-            'blood_type', 'registration_date', 'last_visit_date', 'is_active'
+            'blood_type', 'profile_picture', 'registration_date', 'last_visit_date', 'is_active'
         ]
 
 
