@@ -281,20 +281,37 @@ const MyAppointments = () => {
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
           <Box>
             <Typography variant="h4" component="h1" gutterBottom>
-              My Appointments
+              {user?.first_name ? `${user.first_name}'s Appointments` : 'My Appointments'}
             </Typography>
             <Typography variant="body1" color="text.secondary">
               View and manage your medical appointments
             </Typography>
+            {appointments.length > 0 && (
+              <Typography variant="body2" color="primary.main" sx={{ mt: 1 }}>
+                You have {appointments.filter(apt =>
+                  new Date(apt.date) >= new Date() &&
+                  ['confirmed', 'pending'].includes(apt.status)
+                ).length} upcoming appointments
+              </Typography>
+            )}
           </Box>
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={loadAppointments}
-            disabled={loading}
-          >
-            Refresh
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              variant="contained"
+              startIcon={<CalendarIcon />}
+              onClick={() => window.location.href = '/appointments/book'}
+            >
+              Book New
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<RefreshIcon />}
+              onClick={loadAppointments}
+              disabled={loading}
+            >
+              Refresh
+            </Button>
+          </Box>
         </Box>
 
         {error && (

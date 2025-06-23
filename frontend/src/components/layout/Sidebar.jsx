@@ -156,6 +156,12 @@ const Sidebar = ({ user, onItemClick }) => {
         roles: ['patient'],
       },
       {
+        text: 'My Profile',
+        icon: <PersonIcon />,
+        path: '/patient/profile',
+        roles: ['patient'],
+      },
+      {
         text: 'My Appointments',
         icon: <CalendarTodayIcon />,
         path: '/my-appointments',

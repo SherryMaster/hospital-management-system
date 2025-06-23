@@ -64,7 +64,39 @@ const MainLayout = ({ children, user, onLogout }) => {
 
   const getUserDisplayName = (user) => {
     if (!user) return 'User';
+
+    // For patients, try to get the full name with middle name if available
+    if (user.role === 'patient') {
+      const firstName = user.first_name || '';
+      const middleName = user.middle_name ? ` ${user.middle_name}` : '';
+      const lastName = user.last_name ? ` ${user.last_name}` : '';
+      const fullName = `${firstName}${middleName}${lastName}`.trim();
+
+      if (fullName) {
+        return fullName;
+      }
+    }
+
+    // Fallback for other roles or if patient name is not available
     return user.full_name || `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email || 'User';
+  };
+
+  const getPersonalizedGreeting = (user) => {
+    const hour = new Date().getHours();
+    let timeGreeting = '';
+
+    if (hour < 12) {
+      timeGreeting = 'Good morning';
+    } else if (hour < 17) {
+      timeGreeting = 'Good afternoon';
+    } else {
+      timeGreeting = 'Good evening';
+    }
+
+    const firstName = user.first_name || user.full_name?.split(' ')[0] || 'there';
+    const roleText = user.role === 'patient' ? '' : `, ${user.role}`;
+
+    return `${timeGreeting}, ${firstName}${roleText}!`;
   };
 
   return (
@@ -91,6 +123,11 @@ const MainLayout = ({ children, user, onLogout }) => {
           
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             Hospital Management System
+            {user && (
+              <Typography variant="body2" sx={{ opacity: 0.8, display: { xs: 'none', md: 'block' } }}>
+                {getPersonalizedGreeting(user)}
+              </Typography>
+            )}
           </Typography>
 
           {/* User Profile Menu */}
@@ -150,7 +187,17 @@ const MainLayout = ({ children, user, onLogout }) => {
         transformOrigin={{ horizontal: 'right', vertical: 'top' }}
         anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
       >
-        <MenuItem onClick={handleProfileMenuClose}>
+        <MenuItem
+          onClick={() => {
+            handleProfileMenuClose();
+            // Navigate to profile based on user role
+            if (user?.role === 'patient') {
+              window.location.href = '/patient/profile';
+            } else {
+              window.location.href = '/settings';
+            }
+          }}
+        >
           <AccountCircleIcon sx={{ mr: 2 }} />
           Profile
         </MenuItem>

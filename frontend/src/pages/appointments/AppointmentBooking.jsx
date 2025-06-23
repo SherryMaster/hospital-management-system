@@ -49,13 +49,15 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { MainLayout } from '../../components/layout';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAppointments } from '../../hooks/useApi';
-import { doctorService, appointmentService, departmentService } from '../../services/api';
+import { doctorService, appointmentService, departmentService, patientService } from '../../services/api';
 
 const AppointmentBooking = () => {
   const { user, logout } = useAuth();
   const { createAppointment } = useAppointments();
   const [activeStep, setActiveStep] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [patientProfile, setPatientProfile] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(true);
   const [formData, setFormData] = useState({
     department: '',
     doctor: '',
@@ -76,7 +78,26 @@ const AppointmentBooking = () => {
 
   useEffect(() => {
     loadDepartments();
+    loadPatientProfile();
   }, []);
+
+  const loadPatientProfile = async () => {
+    if (user?.role !== 'patient') return;
+
+    setProfileLoading(true);
+    try {
+      const { data, error } = await patientService.getMyProfile();
+      if (error) {
+        console.error('Failed to load patient profile:', error);
+      } else {
+        setPatientProfile(data);
+      }
+    } catch (error) {
+      console.error('Failed to load patient profile:', error);
+    } finally {
+      setProfileLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (formData.department) {
@@ -573,7 +594,47 @@ const AppointmentBooking = () => {
             <Typography variant="h6" gutterBottom>
               Appointment Summary
             </Typography>
+
+            {/* Patient Information Summary */}
+            {patientProfile && (
+              <Paper sx={{ p: 3, mb: 3, bgcolor: 'primary.light', color: 'primary.contrastText' }}>
+                <Typography variant="subtitle1" gutterBottom fontWeight="bold">
+                  Patient Information
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2" sx={{ opacity: 0.8 }}>Patient Name</Typography>
+                    <Typography variant="body1" fontWeight="medium">
+                      {`${patientProfile.user?.first_name || ''} ${patientProfile.user?.middle_name ? patientProfile.user.middle_name + ' ' : ''}${patientProfile.user?.last_name || ''}`.trim()}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2" sx={{ opacity: 0.8 }}>Patient ID</Typography>
+                    <Typography variant="body1" fontWeight="medium">
+                      {patientProfile.patient_id}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2" sx={{ opacity: 0.8 }}>Blood Type</Typography>
+                    <Typography variant="body1" fontWeight="bold">
+                      {patientProfile.blood_type || 'Not specified'}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2" sx={{ opacity: 0.8 }}>Contact</Typography>
+                    <Typography variant="body1">
+                      {patientProfile.user?.phone_number || 'Not provided'}
+                    </Typography>
+                  </Grid>
+                </Grid>
+              </Paper>
+            )}
+
+            {/* Appointment Details Summary */}
             <Paper sx={{ p: 3, bgcolor: 'grey.50' }}>
+              <Typography variant="subtitle1" gutterBottom fontWeight="bold">
+                Appointment Details
+              </Typography>
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={6}>
                   <Typography variant="body2" color="text.secondary">Department</Typography>
@@ -601,7 +662,9 @@ const AppointmentBooking = () => {
                 </Grid>
                 <Grid item xs={12} sm={6}>
                   <Typography variant="body2" color="text.secondary">Consultation Fee</Typography>
-                  <Typography variant="body1">${getSelectedDoctor()?.fee}</Typography>
+                  <Typography variant="body1" fontWeight="bold" color="primary.main">
+                    ${getSelectedDoctor()?.fee}
+                  </Typography>
                 </Grid>
                 <Grid item xs={12}>
                   <Typography variant="body2" color="text.secondary">Chief Complaint</Typography>
@@ -615,6 +678,25 @@ const AppointmentBooking = () => {
                 )}
               </Grid>
             </Paper>
+
+            {/* Important Medical Information Alert */}
+            {patientProfile && (patientProfile.allergies || patientProfile.chronic_conditions) && (
+              <Alert severity="warning" sx={{ mt: 3 }}>
+                <Typography variant="subtitle2" gutterBottom>
+                  Important Medical Information
+                </Typography>
+                {patientProfile.allergies && (
+                  <Typography variant="body2" gutterBottom>
+                    <strong>Allergies:</strong> {patientProfile.allergies}
+                  </Typography>
+                )}
+                {patientProfile.chronic_conditions && (
+                  <Typography variant="body2">
+                    <strong>Chronic Conditions:</strong> {patientProfile.chronic_conditions}
+                  </Typography>
+                )}
+              </Alert>
+            )}
           </Box>
         );
 
@@ -635,6 +717,102 @@ const AppointmentBooking = () => {
             Schedule your appointment with our healthcare professionals
           </Typography>
         </Box>
+
+        {/* Patient Information Card */}
+        {user?.role === 'patient' && (
+          <Card sx={{ mb: 4 }}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <PersonIcon color="primary" />
+                Patient Information
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+              {profileLoading ? (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <CircularProgress size={20} />
+                  <Typography variant="body2" color="text.secondary">
+                    Loading patient information...
+                  </Typography>
+                </Box>
+              ) : patientProfile ? (
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Box>
+                      <Typography variant="body2" color="text.secondary">Patient Name</Typography>
+                      <Typography variant="body1" fontWeight="medium">
+                        {`${patientProfile.user?.first_name || ''} ${patientProfile.user?.middle_name ? patientProfile.user.middle_name + ' ' : ''}${patientProfile.user?.last_name || ''}`.trim() || 'Not provided'}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Box>
+                      <Typography variant="body2" color="text.secondary">Patient ID</Typography>
+                      <Typography variant="body1" fontWeight="medium">
+                        {patientProfile.patient_id || 'Not assigned'}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Box>
+                      <Typography variant="body2" color="text.secondary">Blood Type</Typography>
+                      <Typography variant="body1" fontWeight="medium" color="error.main">
+                        {patientProfile.blood_type || 'Not specified'}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Box>
+                      <Typography variant="body2" color="text.secondary">Age</Typography>
+                      <Typography variant="body1" fontWeight="medium">
+                        {patientProfile.age || 'Not calculated'}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  {patientProfile.allergies && (
+                    <Grid item xs={12}>
+                      <Box>
+                        <Typography variant="body2" color="text.secondary">Known Allergies</Typography>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                          {patientProfile.allergies.split(',').map((allergy, index) => (
+                            <Chip
+                              key={index}
+                              label={allergy.trim()}
+                              size="small"
+                              color="error"
+                              variant="outlined"
+                            />
+                          ))}
+                        </Box>
+                      </Box>
+                    </Grid>
+                  )}
+                  {patientProfile.chronic_conditions && (
+                    <Grid item xs={12}>
+                      <Box>
+                        <Typography variant="body2" color="text.secondary">Chronic Conditions</Typography>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                          {patientProfile.chronic_conditions.split(',').map((condition, index) => (
+                            <Chip
+                              key={index}
+                              label={condition.trim()}
+                              size="small"
+                              color="warning"
+                              variant="outlined"
+                            />
+                          ))}
+                        </Box>
+                      </Box>
+                    </Grid>
+                  )}
+                </Grid>
+              ) : (
+                <Alert severity="warning">
+                  Unable to load patient information. Please ensure your profile is complete.
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Stepper */}
         <Card sx={{ mb: 4 }}>
