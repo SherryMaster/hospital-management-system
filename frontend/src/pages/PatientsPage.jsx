@@ -28,7 +28,6 @@ import {
   Avatar,
 } from '@mui/material';
 import {
-  Add as AddIcon,
   Search as SearchIcon,
   Edit as EditIcon,
   Visibility as ViewIcon,
@@ -146,13 +145,6 @@ const PatientsPage = () => {
               disabled={loading}
             >
               Refresh
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => {/* TODO: Open create patient dialog */}}
-            >
-              Add Patient
             </Button>
           </Box>
         </Box>
