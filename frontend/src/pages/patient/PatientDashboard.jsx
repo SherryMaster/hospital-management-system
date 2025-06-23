@@ -34,7 +34,7 @@ import {
   MedicalServices as MedicalIcon,
   Medication as MedicationIcon,
   Download as DownloadIcon,
-  ContactPhone as ContactPhoneIcon,
+
 } from '@mui/icons-material';
 import { MainLayout } from '../../components/layout';
 import { useAuth } from '../../contexts/AuthContext';
@@ -44,7 +44,8 @@ import {
   PatientLoadingState,
   PatientErrorAlert,
   PatientSummaryCards,
-  PatientQuickActions
+  PatientQuickActions,
+  PatientProfileSummary
 } from './components';
 
 const PatientDashboard = () => {
@@ -388,248 +389,17 @@ const PatientDashboard = () => {
           title="Failed to load dashboard data"
         />
 
-        {/* Patient Profile Overview */}
+        {/* Patient Profile Summary */}
         <Grid container spacing={3} sx={{ mb: 4 }}>
-          {/* Personal Information */}
-          <Grid item xs={12} md={4}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <PersonIcon color="primary" />
-                  Personal Information
-                </Typography>
-                <Divider sx={{ mb: 2 }} />
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary">Full Name</Typography>
-                    <Typography variant="body1" fontWeight="medium">
-                      {`${dashboardData.patientProfile.first_name} ${dashboardData.patientProfile.middle_name ? dashboardData.patientProfile.middle_name + ' ' : ''}${dashboardData.patientProfile.last_name}`.trim() || 'Not provided'}
-                    </Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary">Date of Birth</Typography>
-                    <Typography variant="body1">
-                      {dashboardData.patientProfile.date_of_birth ? new Date(dashboardData.patientProfile.date_of_birth).toLocaleDateString() : 'Not provided'}
-                    </Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary">Age</Typography>
-                    <Typography variant="body1">{dashboardData.patientProfile.age || 'Not calculated'}</Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary">Gender</Typography>
-                    <Typography variant="body1" sx={{ textTransform: 'capitalize' }}>
-                      {dashboardData.patientProfile.gender === 'M' ? 'Male' : dashboardData.patientProfile.gender === 'F' ? 'Female' : dashboardData.patientProfile.gender || 'Not specified'}
-                    </Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary">Marital Status</Typography>
-                    <Typography variant="body1" sx={{ textTransform: 'capitalize' }}>
-                      {dashboardData.patientProfile.marital_status || 'Not specified'}
-                    </Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary">Occupation</Typography>
-                    <Typography variant="body1">{dashboardData.patientProfile.occupation || 'Not specified'}</Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Contact Information */}
-          <Grid item xs={12} md={4}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <ContactPhoneIcon color="primary" />
-                  Contact Information
-                </Typography>
-                <Divider sx={{ mb: 2 }} />
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary">Email</Typography>
-                    <Typography variant="body1">{dashboardData.patientProfile.email || 'Not provided'}</Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary">Phone Number</Typography>
-                    <Typography variant="body1">{dashboardData.patientProfile.phone_number || 'Not provided'}</Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary">Address</Typography>
-                    <Typography variant="body1">
-                      {[
-                        dashboardData.patientProfile.address_line_1,
-                        dashboardData.patientProfile.address_line_2,
-                        dashboardData.patientProfile.city,
-                        dashboardData.patientProfile.state,
-                        dashboardData.patientProfile.postal_code,
-                        dashboardData.patientProfile.country
-                      ].filter(Boolean).join(', ') || 'Not provided'}
-                    </Typography>
-                  </Box>
-                  <Divider sx={{ my: 1 }} />
-                  <Typography variant="subtitle2" color="primary">Emergency Contact</Typography>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary">Name</Typography>
-                    <Typography variant="body1">{dashboardData.patientProfile.emergency_contact_name || 'Not provided'}</Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary">Phone</Typography>
-                    <Typography variant="body1">{dashboardData.patientProfile.emergency_contact_phone || 'Not provided'}</Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary">Relationship</Typography>
-                    <Typography variant="body1" sx={{ textTransform: 'capitalize' }}>
-                      {dashboardData.patientProfile.emergency_contact_relationship || 'Not specified'}
-                    </Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Medical & Insurance Information */}
-          <Grid item xs={12} md={4}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <HospitalIcon color="primary" />
-                  Medical & Insurance
-                </Typography>
-                <Divider sx={{ mb: 2 }} />
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary">Blood Type</Typography>
-                    <Typography variant="body1" fontWeight="bold" color="error.main">
-                      {dashboardData.patientProfile.blood_type || 'Not specified'}
-                    </Typography>
-                  </Box>
-                  {dashboardData.patientProfile.height && (
-                    <Box>
-                      <Typography variant="body2" color="text.secondary">Height</Typography>
-                      <Typography variant="body1">{dashboardData.patientProfile.height} cm</Typography>
-                    </Box>
-                  )}
-                  {dashboardData.patientProfile.weight && (
-                    <Box>
-                      <Typography variant="body2" color="text.secondary">Weight</Typography>
-                      <Typography variant="body1">{dashboardData.patientProfile.weight} kg</Typography>
-                    </Box>
-                  )}
-                  {dashboardData.patientProfile.bmi && (
-                    <Box>
-                      <Typography variant="body2" color="text.secondary">BMI</Typography>
-                      <Typography variant="body1">
-                        {dashboardData.patientProfile.bmi} ({dashboardData.patientProfile.bmi_category})
-                      </Typography>
-                    </Box>
-                  )}
-                  <Divider sx={{ my: 1 }} />
-                  <Typography variant="subtitle2" color="primary">Insurance Information</Typography>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary">Provider</Typography>
-                    <Typography variant="body1">{dashboardData.patientProfile.insurance_provider || 'Not provided'}</Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary">Policy Number</Typography>
-                    <Typography variant="body1">{dashboardData.patientProfile.insurance_policy_number || 'Not provided'}</Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary">Group Number</Typography>
-                    <Typography variant="body1">{dashboardData.patientProfile.insurance_group_number || 'Not provided'}</Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
+          <Grid item xs={12} md={6}>
+            <PatientProfileSummary
+              patientProfile={dashboardData.patientProfile}
+              upcomingAppointments={dashboardData.upcomingAppointments}
+            />
           </Grid>
         </Grid>
 
-        {/* Medical History Overview */}
-        {(dashboardData.patientProfile.allergies || dashboardData.patientProfile.chronic_conditions ||
-          dashboardData.patientProfile.current_medications || dashboardData.patientProfile.family_medical_history ||
-          dashboardData.patientProfile.surgical_history) && (
-          <Grid container spacing={3} sx={{ mb: 4 }}>
-            <Grid item xs={12}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <MedicalIcon color="primary" />
-                    Detailed Medical History
-                  </Typography>
-                  <Divider sx={{ mb: 3 }} />
-                  <Grid container spacing={3}>
-                    {dashboardData.patientProfile.allergies && (
-                      <Grid item xs={12} md={6}>
-                        <Box>
-                          <Typography variant="subtitle2" color="error.main" gutterBottom>
-                            Allergies
-                          </Typography>
-                          <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                            {dashboardData.patientProfile.allergies}
-                          </Typography>
-                        </Box>
-                      </Grid>
-                    )}
-                    {dashboardData.patientProfile.chronic_conditions && (
-                      <Grid item xs={12} md={6}>
-                        <Box>
-                          <Typography variant="subtitle2" color="warning.main" gutterBottom>
-                            Chronic Conditions
-                          </Typography>
-                          <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                            {dashboardData.patientProfile.chronic_conditions}
-                          </Typography>
-                        </Box>
-                      </Grid>
-                    )}
-                    {dashboardData.patientProfile.current_medications && (
-                      <Grid item xs={12} md={6}>
-                        <Box>
-                          <Typography variant="subtitle2" color="primary.main" gutterBottom>
-                            Current Medications
-                          </Typography>
-                          <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                            {dashboardData.patientProfile.current_medications}
-                          </Typography>
-                        </Box>
-                      </Grid>
-                    )}
-                    {dashboardData.patientProfile.family_medical_history && (
-                      <Grid item xs={12} md={6}>
-                        <Box>
-                          <Typography variant="subtitle2" color="info.main" gutterBottom>
-                            Family Medical History
-                          </Typography>
-                          <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                            {dashboardData.patientProfile.family_medical_history}
-                          </Typography>
-                        </Box>
-                      </Grid>
-                    )}
-                    {dashboardData.patientProfile.surgical_history && (
-                      <Grid item xs={12}>
-                        <Box>
-                          <Typography variant="subtitle2" color="secondary.main" gutterBottom>
-                            Surgical History
-                          </Typography>
-                          <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                            {dashboardData.patientProfile.surgical_history}
-                          </Typography>
-                        </Box>
-                      </Grid>
-                    )}
-                  </Grid>
-                </CardContent>
-                <CardActions>
-                  <Button size="small" startIcon={<PersonIcon />}>
-                    Edit Medical History
-                  </Button>
-                </CardActions>
-              </Card>
-            </Grid>
-          </Grid>
-        )}
+
 
         {/* Quick Stats */}
         <PatientSummaryCards
@@ -952,9 +722,19 @@ const PatientDashboard = () => {
               {!dashboardData.patientProfile.blood_type && (
                 <Grid item xs={12}>
                   <Alert severity="info" sx={{ bgcolor: 'rgba(255,255,255,0.9)' }}>
-                    <Typography variant="body2">
-                      <strong>Complete Your Profile:</strong> Please update your blood type and other medical information for better healthcare service.
-                    </Typography>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Typography variant="body2">
+                        <strong>Complete Your Profile:</strong> Please update your blood type and other medical information for better healthcare service.
+                      </Typography>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => window.location.href = '/patient/profile'}
+                        sx={{ ml: 2 }}
+                      >
+                        Update Profile
+                      </Button>
+                    </Box>
                   </Alert>
                 </Grid>
               )}

@@ -49,6 +49,7 @@ import {
   FilterList as FilterIcon,
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs from 'dayjs';
 import { MainLayout } from '../../components/layout';
 import { useAuth } from '../../contexts/AuthContext';
 import { appointmentService } from '../../services/api';
@@ -209,7 +210,7 @@ const AppointmentManagement = () => {
     try {
       // Reschedule appointment via API
       const updateData = {
-        appointment_date: rescheduleData.date?.toISOString().split('T')[0],
+        appointment_date: rescheduleData.date ? rescheduleData.date.format('YYYY-MM-DD') : '',
         appointment_time: rescheduleData.timeSlot,
         status: 'pending', // Reset to pending after reschedule
         notes: rescheduleData.reason ? `Rescheduled: ${rescheduleData.reason}` : undefined
@@ -227,7 +228,7 @@ const AppointmentManagement = () => {
           apt.id === selectedAppointment.id
             ? {
                 ...apt,
-                date: rescheduleData.date?.toISOString().split('T')[0],
+                date: rescheduleData.date ? rescheduleData.date.format('YYYY-MM-DD') : '',
                 time: rescheduleData.timeSlot,
                 status: 'pending',
               }
@@ -318,7 +319,7 @@ const AppointmentManagement = () => {
                 label="New Date"
                 value={rescheduleData.date}
                 onChange={(date) => setRescheduleData(prev => ({ ...prev, date }))}
-                minDate={new Date()}
+                minDate={dayjs()}
                 slotProps={{
                   textField: { fullWidth: true }
                 }}

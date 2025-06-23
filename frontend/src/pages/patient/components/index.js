@@ -11,3 +11,4 @@ export { default as PatientErrorAlert } from './PatientErrorAlert';
 export { default as PatientSummaryCards } from './PatientSummaryCards';
 export { default as PatientQuickActions } from './PatientQuickActions';
 export { default as PatientTableActions } from './PatientTableActions';
+export { default as PatientProfileSummary } from './PatientProfileSummary';

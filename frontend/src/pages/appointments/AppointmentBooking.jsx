@@ -46,6 +46,7 @@ import {
   Check as CheckIcon,
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs from 'dayjs';
 import { MainLayout } from '../../components/layout';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAppointments } from '../../hooks/useApi';
@@ -349,7 +350,7 @@ const AppointmentBooking = () => {
         patient: user?.patient_profile?.id || user?.id,
         doctor: formData.doctor,
         department: formData.department,
-        appointment_date: formData.appointmentDate.toISOString().split('T')[0],
+        appointment_date: formData.appointmentDate ? formData.appointmentDate.format('YYYY-MM-DD') : '',
         appointment_time: selectedTimeSlot?.time || formData.timeSlot,
         appointment_type: formData.appointmentType,
         chief_complaint: formData.chiefComplaint,
@@ -490,8 +491,8 @@ const AppointmentBooking = () => {
                 label="Appointment Date"
                 value={formData.appointmentDate}
                 onChange={(date) => handleInputChange('appointmentDate', date)}
-                minDate={new Date()}
-                maxDate={new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)} // 30 days from now
+                minDate={dayjs()}
+                maxDate={dayjs().add(30, 'day')} // 30 days from now
                 slotProps={{
                   textField: {
                     fullWidth: true,
