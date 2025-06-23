@@ -43,6 +43,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useUsers } from '../../hooks/useApi';
 import { TableLoader } from '../../components/common/LoadingSpinner';
+import AdminUserCreateDialog from '../../components/forms/AdminUserCreateDialog';
 
 const UsersPage = () => {
   const { user, logout } = useAuth();
@@ -111,17 +112,12 @@ const UsersPage = () => {
   };
 
   const handleCreateClick = () => {
-    setFormData({
-      username: '',
-      email: '',
-      first_name: '',
-      last_name: '',
-      role: 'patient',
-      phone_number: '',
-      password: '',
-      password_confirm: '',
-    });
     setCreateDialogOpen(true);
+  };
+
+  const handleUserCreated = (newUser) => {
+    // Refresh the users list when a new user is created
+    loadUsers();
   };
 
   const handleEditClick = (user) => {
@@ -372,11 +368,17 @@ const UsersPage = () => {
           </CardContent>
         </Card>
 
-        {/* Create/Edit User Dialog */}
+        {/* Create User Dialog */}
+        <AdminUserCreateDialog
+          open={createDialogOpen}
+          onClose={() => setCreateDialogOpen(false)}
+          onUserCreated={handleUserCreated}
+        />
+
+        {/* Edit User Dialog */}
         <Dialog
-          open={createDialogOpen || editDialogOpen}
+          open={editDialogOpen}
           onClose={() => {
-            setCreateDialogOpen(false);
             setEditDialogOpen(false);
             setUserToEdit(null);
           }}
@@ -384,7 +386,7 @@ const UsersPage = () => {
           fullWidth
         >
           <DialogTitle>
-            {userToEdit ? 'Edit User' : 'Create New User'}
+            Edit User
           </DialogTitle>
           <DialogContent>
             <Box sx={{ pt: 2 }}>
@@ -451,61 +453,32 @@ const UsersPage = () => {
                     onChange={(e) => handleFormChange('phone_number', e.target.value)}
                   />
                 </Grid>
-                {!userToEdit && (
-                  <>
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        fullWidth
-                        label="Password"
-                        type="password"
-                        value={formData.password}
-                        onChange={(e) => handleFormChange('password', e.target.value)}
-                        required
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        fullWidth
-                        label="Confirm Password"
-                        type="password"
-                        value={formData.password_confirm}
-                        onChange={(e) => handleFormChange('password_confirm', e.target.value)}
-                        required
-                      />
-                    </Grid>
-                  </>
-                )}
-                {userToEdit && (
-                  <>
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        fullWidth
-                        label="New Password (optional)"
-                        type="password"
-                        value={formData.password}
-                        onChange={(e) => handleFormChange('password', e.target.value)}
-                        helperText="Leave blank to keep current password"
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        fullWidth
-                        label="Confirm New Password"
-                        type="password"
-                        value={formData.password_confirm}
-                        onChange={(e) => handleFormChange('password_confirm', e.target.value)}
-                        disabled={!formData.password}
-                      />
-                    </Grid>
-                  </>
-                )}
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="New Password (optional)"
+                    type="password"
+                    value={formData.password}
+                    onChange={(e) => handleFormChange('password', e.target.value)}
+                    helperText="Leave blank to keep current password"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Confirm New Password"
+                    type="password"
+                    value={formData.password_confirm}
+                    onChange={(e) => handleFormChange('password_confirm', e.target.value)}
+                    disabled={!formData.password}
+                  />
+                </Grid>
               </Grid>
             </Box>
           </DialogContent>
           <DialogActions>
             <Button
               onClick={() => {
-                setCreateDialogOpen(false);
                 setEditDialogOpen(false);
                 setUserToEdit(null);
               }}
@@ -517,7 +490,7 @@ const UsersPage = () => {
               variant="contained"
               disabled={loading}
             >
-              {userToEdit ? 'Update' : 'Create'}
+              Update
             </Button>
           </DialogActions>
         </Dialog>

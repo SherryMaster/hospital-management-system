@@ -18,7 +18,8 @@ from .serializers import (
     UserListSerializer,
     DoctorCreateSerializer,
     NurseCreateSerializer,
-    UserCreateSerializer
+    UserCreateSerializer,
+    AdminUserCreateSerializer
 )
 from .permissions import IsOwnerOrAdmin, IsAdminUser
 
@@ -295,4 +296,37 @@ class NurseCreateView(generics.CreateAPIView):
         return Response({
             'user': UserProfileSerializer(user).data,
             'message': f'Nurse {user.get_full_name()} created successfully'
+        }, status=status.HTTP_201_CREATED)
+
+
+class AdminUserCreateView(generics.CreateAPIView):
+    """
+    Unified admin user creation endpoint for all user types
+    """
+    queryset = User.objects.all()
+    serializer_class = AdminUserCreateSerializer
+    permission_classes = [IsAdminUser]
+
+    @extend_schema(
+        summary="Create user (admin)",
+        description="Create a new user of any type with complete profile information (admin only)",
+        request=AdminUserCreateSerializer,
+        responses={201: UserProfileSerializer}
+    )
+    def post(self, request, *args, **kwargs):
+        # Ensure only admins can create users
+        if not request.user.is_authenticated or not request.user.is_admin:
+            return Response({
+                'error': 'Only administrators can create user accounts.',
+                'detail': 'You must be logged in as an administrator to perform this action.'
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+
+        role_display = user.get_role_display()
+        return Response({
+            'user': UserProfileSerializer(user).data,
+            'message': f'{role_display} {user.get_full_name()} created successfully'
         }, status=status.HTTP_201_CREATED)

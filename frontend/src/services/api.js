@@ -315,6 +315,15 @@ export const userService = {
     }
   },
 
+  createAdminUser: async (userData) => {
+    try {
+      const response = await api.post('/auth/users/create/', userData);
+      return { data: response.data, error: null };
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  },
+
   updateUser: async (userId, userData) => {
     try {
       const response = await api.patch(`/auth/users/${userId}/`, userData);

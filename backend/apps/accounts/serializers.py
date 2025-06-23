@@ -560,6 +560,386 @@ class DoctorCreateSerializer(serializers.ModelSerializer):
         return user
 
 
+class AdminUserCreateSerializer(serializers.ModelSerializer):
+    """
+    Unified serializer for creating any user type from admin interface
+    Handles role-specific validation and profile creation
+    """
+    password = serializers.CharField(
+        write_only=True,
+        validators=[validate_password],
+        style={'input_type': 'password'}
+    )
+    password_confirm = serializers.CharField(
+        write_only=True,
+        style={'input_type': 'password'}
+    )
+    phone_number = PhoneNumberField(required=True)
+
+    # Role selection field
+    role = serializers.ChoiceField(
+        choices=User.UserRole.choices,
+        required=True
+    )
+
+    # Patient-specific fields
+    blood_type = serializers.ChoiceField(
+        choices=[('', 'Select Blood Type')] + (list(Patient.BloodType.choices) if Patient else []),
+        required=False,
+        allow_blank=True
+    )
+    height = serializers.FloatField(required=False, allow_null=True)
+    weight = serializers.FloatField(required=False, allow_null=True)
+    marital_status = serializers.ChoiceField(
+        choices=[('', 'Select Status')] + (list(Patient.MaritalStatus.choices) if Patient else []),
+        required=False,
+        allow_blank=True
+    )
+    allergies = serializers.CharField(required=False, allow_blank=True)
+    chronic_conditions = serializers.CharField(required=False, allow_blank=True)
+    current_medications = serializers.CharField(required=False, allow_blank=True)
+    family_medical_history = serializers.CharField(required=False, allow_blank=True)
+    surgical_history = serializers.CharField(required=False, allow_blank=True)
+
+    # Doctor-specific fields
+    license_number = serializers.CharField(max_length=50, required=False, allow_blank=True)
+    department_name = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    specializations = serializers.ListField(
+        child=serializers.CharField(max_length=100),
+        required=False,
+        allow_empty=True
+    )
+    medical_school = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    graduation_year = serializers.IntegerField(required=False, allow_null=True)
+    years_of_experience = serializers.IntegerField(required=False, allow_null=True)
+    consultation_fee = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, allow_null=True)
+    employment_status = serializers.ChoiceField(
+        choices=[('', 'Select Status')] + (list(Doctor.EmploymentStatus.choices) if Doctor else []),
+        required=False,
+        allow_blank=True
+    )
+
+    # Nurse-specific fields
+    nursing_level = serializers.ChoiceField(
+        choices=[('', 'Select Level')] + (list(Nurse.NursingLevel.choices) if Nurse else []),
+        required=False,
+        allow_blank=True
+    )
+    nursing_school = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    shift_preference = serializers.ChoiceField(
+        choices=[('', 'Select Shift')] + (list(Nurse.ShiftType.choices) if Nurse else []),
+        required=False,
+        allow_blank=True
+    )
+    unit = serializers.CharField(max_length=100, required=False, allow_blank=True)
+
+    # Administrator-specific fields
+    access_level = serializers.ChoiceField(
+        choices=[('', 'Select Level')] + (list(Administrator.AccessLevel.choices) if Administrator else []),
+        required=False,
+        allow_blank=True
+    )
+    office_location = serializers.CharField(max_length=200, required=False, allow_blank=True)
+
+    # Receptionist-specific fields
+    reception_area = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    languages_spoken = serializers.ListField(
+        child=serializers.CharField(max_length=50),
+        required=False,
+        allow_empty=True
+    )
+
+    # Pharmacist-specific fields
+    pharmacy_license_number = serializers.CharField(max_length=50, required=False, allow_blank=True)
+    pharmacy_school = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    can_dispense_controlled_substances = serializers.BooleanField(required=False, default=True)
+
+    class Meta:
+        model = User
+        fields = [
+            # Basic user fields
+            'username', 'email', 'password', 'password_confirm', 'first_name', 'last_name',
+            'role', 'phone_number', 'date_of_birth', 'gender', 'address', 'city', 'state',
+            'postal_code', 'country', 'emergency_contact_name', 'emergency_contact_phone',
+            'emergency_contact_relationship',
+            # Patient fields
+            'blood_type', 'height', 'weight', 'marital_status', 'allergies', 'chronic_conditions',
+            'current_medications', 'family_medical_history', 'surgical_history',
+            # Doctor fields
+            'license_number', 'department_name', 'specializations', 'medical_school',
+            'graduation_year', 'years_of_experience', 'consultation_fee', 'employment_status',
+            # Nurse fields
+            'nursing_level', 'nursing_school', 'shift_preference', 'unit',
+            # Administrator fields
+            'access_level', 'office_location',
+            # Receptionist fields
+            'reception_area', 'languages_spoken',
+            # Pharmacist fields
+            'pharmacy_license_number', 'pharmacy_school', 'can_dispense_controlled_substances'
+        ]
+        extra_kwargs = {
+            'password': {'write_only': True},
+            'password_confirm': {'write_only': True},
+        }
+
+    def validate(self, attrs):
+        """Validate data based on selected role"""
+        # Password confirmation validation
+        if attrs.get('password') != attrs.get('password_confirm'):
+            raise serializers.ValidationError({'password_confirm': 'Passwords do not match.'})
+
+        role = attrs.get('role')
+        if not role:
+            raise serializers.ValidationError({'role': 'User role is required.'})
+
+        # Role-specific validation
+        if role == User.UserRole.PATIENT:
+            self._validate_patient_fields(attrs)
+        elif role == User.UserRole.DOCTOR:
+            self._validate_doctor_fields(attrs)
+        elif role == User.UserRole.NURSE:
+            self._validate_nurse_fields(attrs)
+        elif role == User.UserRole.ADMIN:
+            self._validate_admin_fields(attrs)
+        elif role == User.UserRole.RECEPTIONIST:
+            self._validate_receptionist_fields(attrs)
+        elif role == User.UserRole.PHARMACIST:
+            self._validate_pharmacist_fields(attrs)
+
+        return attrs
+
+    def _validate_patient_fields(self, attrs):
+        """Validate patient-specific fields"""
+        # Basic validation - most patient fields are optional for admin creation
+        pass
+
+    def _validate_doctor_fields(self, attrs):
+        """Validate doctor-specific fields"""
+        required_fields = ['license_number']
+        for field in required_fields:
+            if not attrs.get(field):
+                raise serializers.ValidationError({field: f'{field.replace("_", " ").title()} is required for doctors.'})
+
+    def _validate_nurse_fields(self, attrs):
+        """Validate nurse-specific fields"""
+        required_fields = ['license_number', 'nursing_level']
+        for field in required_fields:
+            if not attrs.get(field):
+                raise serializers.ValidationError({field: f'{field.replace("_", " ").title()} is required for nurses.'})
+
+    def _validate_admin_fields(self, attrs):
+        """Validate administrator-specific fields"""
+        required_fields = ['access_level']
+        for field in required_fields:
+            if not attrs.get(field):
+                raise serializers.ValidationError({field: f'{field.replace("_", " ").title()} is required for administrators.'})
+
+    def _validate_receptionist_fields(self, attrs):
+        """Validate receptionist-specific fields"""
+        # Basic validation - most receptionist fields are optional
+        pass
+
+    def _validate_pharmacist_fields(self, attrs):
+        """Validate pharmacist-specific fields"""
+        required_fields = ['pharmacy_license_number']
+        for field in required_fields:
+            if not attrs.get(field):
+                raise serializers.ValidationError({field: f'{field.replace("_", " ").title()} is required for pharmacists.'})
+
+    def create(self, validated_data):
+        """Create user with role-specific profile"""
+        # Extract role-specific data
+        role = validated_data.get('role')
+        password = validated_data.pop('password')
+        validated_data.pop('password_confirm', None)
+
+        # Extract role-specific fields
+        patient_fields = self._extract_patient_fields(validated_data)
+        doctor_fields = self._extract_doctor_fields(validated_data)
+        nurse_fields = self._extract_nurse_fields(validated_data)
+        admin_fields = self._extract_admin_fields(validated_data)
+        receptionist_fields = self._extract_receptionist_fields(validated_data)
+        pharmacist_fields = self._extract_pharmacist_fields(validated_data)
+
+        # Disconnect the signal temporarily to avoid automatic profile creation
+        from django.db.models.signals import post_save
+        from .signals import user_post_save
+        post_save.disconnect(user_post_save, sender=User)
+
+        try:
+            # Create user
+            user = User.objects.create_user(password=password, **validated_data)
+
+            # Create role-specific profile
+            if role == User.UserRole.PATIENT and Patient:
+                self._create_patient_profile(user, patient_fields)
+            elif role == User.UserRole.DOCTOR and Doctor:
+                self._create_doctor_profile(user, doctor_fields)
+            elif role == User.UserRole.NURSE and Nurse:
+                self._create_nurse_profile(user, nurse_fields)
+            elif role == User.UserRole.ADMIN and Administrator:
+                self._create_admin_profile(user, admin_fields)
+            elif role == User.UserRole.RECEPTIONIST and Receptionist:
+                self._create_receptionist_profile(user, receptionist_fields)
+            elif role == User.UserRole.PHARMACIST and Pharmacist:
+                self._create_pharmacist_profile(user, pharmacist_fields)
+
+        finally:
+            # Reconnect the signal
+            post_save.connect(user_post_save, sender=User)
+
+        return user
+
+    def _extract_patient_fields(self, validated_data):
+        """Extract patient-specific fields from validated data"""
+        patient_fields = {}
+        patient_field_names = [
+            'blood_type', 'height', 'weight', 'marital_status', 'allergies',
+            'chronic_conditions', 'current_medications', 'family_medical_history', 'surgical_history'
+        ]
+        for field in patient_field_names:
+            if field in validated_data:
+                patient_fields[field] = validated_data.pop(field)
+        return patient_fields
+
+    def _extract_doctor_fields(self, validated_data):
+        """Extract doctor-specific fields from validated data"""
+        doctor_fields = {}
+        doctor_field_names = [
+            'license_number', 'department_name', 'specializations', 'medical_school',
+            'graduation_year', 'years_of_experience', 'consultation_fee', 'employment_status'
+        ]
+        for field in doctor_field_names:
+            if field in validated_data:
+                doctor_fields[field] = validated_data.pop(field)
+        return doctor_fields
+
+    def _extract_nurse_fields(self, validated_data):
+        """Extract nurse-specific fields from validated data"""
+        nurse_fields = {}
+        nurse_field_names = [
+            'license_number', 'nursing_level', 'nursing_school', 'shift_preference', 'unit'
+        ]
+        for field in nurse_field_names:
+            if field in validated_data:
+                nurse_fields[field] = validated_data.pop(field)
+        return nurse_fields
+
+    def _extract_admin_fields(self, validated_data):
+        """Extract administrator-specific fields from validated data"""
+        admin_fields = {}
+        admin_field_names = ['access_level', 'office_location']
+        for field in admin_field_names:
+            if field in validated_data:
+                admin_fields[field] = validated_data.pop(field)
+        return admin_fields
+
+    def _extract_receptionist_fields(self, validated_data):
+        """Extract receptionist-specific fields from validated data"""
+        receptionist_fields = {}
+        receptionist_field_names = ['reception_area', 'languages_spoken']
+        for field in receptionist_field_names:
+            if field in validated_data:
+                receptionist_fields[field] = validated_data.pop(field)
+        return receptionist_fields
+
+    def _extract_pharmacist_fields(self, validated_data):
+        """Extract pharmacist-specific fields from validated data"""
+        pharmacist_fields = {}
+        pharmacist_field_names = [
+            'pharmacy_license_number', 'pharmacy_school', 'can_dispense_controlled_substances'
+        ]
+        for field in pharmacist_field_names:
+            if field in validated_data:
+                pharmacist_fields[field] = validated_data.pop(field)
+        return pharmacist_fields
+
+    def _create_patient_profile(self, user, patient_fields):
+        """Create patient profile with provided fields"""
+        Patient.objects.create(
+            user=user,
+            blood_type=patient_fields.get('blood_type', Patient.BloodType.UNKNOWN),
+            height=patient_fields.get('height'),
+            weight=patient_fields.get('weight'),
+            marital_status=patient_fields.get('marital_status'),
+            allergies=patient_fields.get('allergies', ''),
+            chronic_conditions=patient_fields.get('chronic_conditions', ''),
+            current_medications=patient_fields.get('current_medications', ''),
+            family_medical_history=patient_fields.get('family_medical_history', ''),
+            surgical_history=patient_fields.get('surgical_history', ''),
+        )
+
+    def _create_doctor_profile(self, user, doctor_fields):
+        """Create doctor profile with provided fields"""
+        # Handle department
+        department = None
+        if doctor_fields.get('department_name'):
+            department, _ = Department.objects.get_or_create(
+                name=doctor_fields['department_name']
+            )
+
+        doctor = Doctor.objects.create(
+            user=user,
+            license_number=doctor_fields.get('license_number'),
+            department=department,
+            medical_school=doctor_fields.get('medical_school', ''),
+            graduation_year=doctor_fields.get('graduation_year'),
+            years_of_experience=doctor_fields.get('years_of_experience', 0),
+            consultation_fee=doctor_fields.get('consultation_fee', 0.00),
+            employment_status=doctor_fields.get('employment_status', Doctor.EmploymentStatus.FULL_TIME),
+            is_accepting_patients=True,
+        )
+
+        # Handle specializations
+        if doctor_fields.get('specializations'):
+            for spec_name in doctor_fields['specializations']:
+                specialization, _ = Specialization.objects.get_or_create(name=spec_name)
+                doctor.specializations.add(specialization)
+
+    def _create_nurse_profile(self, user, nurse_fields):
+        """Create nurse profile with provided fields"""
+        Nurse.objects.create(
+            user=user,
+            license_number=nurse_fields.get('license_number'),
+            nursing_level=nurse_fields.get('nursing_level', Nurse.NursingLevel.RN),
+            department=nurse_fields.get('unit', ''),
+            unit=nurse_fields.get('unit', ''),
+            nursing_school=nurse_fields.get('nursing_school', ''),
+            shift_preference=nurse_fields.get('shift_preference', Nurse.ShiftType.DAY),
+            employment_status=Nurse.EmploymentStatus.FULL_TIME,
+            is_active=True,
+        )
+
+    def _create_admin_profile(self, user, admin_fields):
+        """Create administrator profile with provided fields"""
+        Administrator.objects.create(
+            user=user,
+            access_level=admin_fields.get('access_level', Administrator.AccessLevel.SYSTEM_ADMIN),
+            office_location=admin_fields.get('office_location', ''),
+        )
+
+    def _create_receptionist_profile(self, user, receptionist_fields):
+        """Create receptionist profile with provided fields"""
+        Receptionist.objects.create(
+            user=user,
+            reception_area=receptionist_fields.get('reception_area', ''),
+            languages_spoken=receptionist_fields.get('languages_spoken', []),
+            employment_status=Receptionist.EmploymentStatus.FULL_TIME,
+            is_active=True,
+        )
+
+    def _create_pharmacist_profile(self, user, pharmacist_fields):
+        """Create pharmacist profile with provided fields"""
+        Pharmacist.objects.create(
+            user=user,
+            license_number=pharmacist_fields.get('pharmacy_license_number'),
+            pharmacy_school=pharmacist_fields.get('pharmacy_school', ''),
+            can_dispense_controlled_substances=pharmacist_fields.get('can_dispense_controlled_substances', True),
+            employment_status=Pharmacist.EmploymentStatus.FULL_TIME,
+            is_active=True,
+        )
+
+
 class NurseCreateSerializer(serializers.ModelSerializer):
     """
     Serializer for creating nurse users with complete profile (admin only)
