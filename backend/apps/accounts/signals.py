@@ -30,8 +30,29 @@ def user_post_save(sender, instance, created, **kwargs):
         # Log user creation
         logger.info(f"New user created: {instance.username} ({instance.role})")
 
-        # Auto-create Patient profile for patient users
-        if instance.role == 'patient' and Patient:
+        # Import staff models here to avoid circular imports
+        try:
+            from apps.staff.models import Administrator
+        except ImportError:
+            Administrator = None
+
+        # Create Administrator profile for admin users or superusers
+        if (instance.role == 'admin' or instance.is_superuser) and Administrator:
+            try:
+                # Check if admin profile already exists
+                if not hasattr(instance, 'admin_profile'):
+                    admin = Administrator.objects.create(
+                        user=instance,
+                        employee_id=f"EMP{instance.id:06d}",
+                        access_level=Administrator.AccessLevel.SUPER_ADMIN if instance.is_superuser else Administrator.AccessLevel.SYSTEM_ADMIN,
+                        department="Administration"
+                    )
+                    logger.info(f"Administrator profile created for user: {instance.username} (ID: {admin.admin_id})")
+            except Exception as e:
+                logger.error(f"Failed to create administrator profile for {instance.username}: {str(e)}")
+
+        # Auto-create Patient profile for patient users (only if not admin/superuser)
+        elif instance.role == 'patient' and not instance.is_superuser and not instance.role == 'admin' and Patient:
             try:
                 # Check if patient profile already exists
                 if not hasattr(instance, 'patient_profile'):

@@ -11,11 +11,13 @@ from drf_spectacular.types import OpenApiTypes
 
 from .serializers import (
     CustomTokenObtainPairSerializer,
-    UserRegistrationSerializer,
+    PatientRegistrationSerializer,
     UserProfileSerializer,
     UserUpdateSerializer,
     PasswordChangeSerializer,
     UserListSerializer,
+    DoctorCreateSerializer,
+    NurseCreateSerializer,
     UserCreateSerializer
 )
 from .permissions import IsOwnerOrAdmin, IsAdminUser
@@ -30,20 +32,30 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
 
 
-class UserRegistrationView(generics.CreateAPIView):
+class PatientRegistrationView(generics.CreateAPIView):
     """
-    User registration endpoint
+    Patient registration endpoint - public registration for patients only
     """
     queryset = User.objects.all()
-    serializer_class = UserRegistrationSerializer
+    serializer_class = PatientRegistrationSerializer
     permission_classes = [permissions.AllowAny]
 
     @extend_schema(
-        summary="Register new user",
-        description="Create a new user account",
+        summary="Register new patient",
+        description="Create a new patient account with comprehensive medical information. Only patients can register publicly.",
         responses={201: UserProfileSerializer}
     )
     def post(self, request, *args, **kwargs):
+        # Explicitly prevent non-patient registration through this endpoint
+        if 'role' in request.data and request.data['role'] != User.UserRole.PATIENT:
+            return Response({
+                'error': 'Public registration is only available for patients. Other user types must be created by administrators.',
+                'detail': 'If you are a healthcare professional, please contact your system administrator to create your account.'
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        # Ensure role is set to patient
+        request.data['role'] = User.UserRole.PATIENT
+
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
@@ -57,8 +69,16 @@ class UserRegistrationView(generics.CreateAPIView):
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),
             },
-            'message': 'User registered successfully'
+            'message': 'Patient registered successfully'
         }, status=status.HTTP_201_CREATED)
+
+
+# Keep the old view name for backward compatibility
+class UserRegistrationView(PatientRegistrationView):
+    """
+    Legacy user registration endpoint - now redirects to patient registration
+    """
+    pass
 
 
 class UserProfileView(generics.RetrieveUpdateAPIView):
@@ -206,3 +226,73 @@ class UserListView(generics.ListCreateAPIView):
     )
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
+
+
+class DoctorCreateView(generics.CreateAPIView):
+    """
+    Create new doctor user with complete profile (admin only)
+    """
+    queryset = User.objects.all()
+    serializer_class = DoctorCreateSerializer
+    permission_classes = [IsAdminUser]
+
+    @extend_schema(
+        summary="Create new doctor",
+        description="Create a new doctor account with complete medical credentials (admin only)",
+        request=DoctorCreateSerializer,
+        responses={201: UserProfileSerializer}
+    )
+    def post(self, request, *args, **kwargs):
+        # Ensure only admins can create doctors
+        if not request.user.is_authenticated or not request.user.is_admin:
+            return Response({
+                'error': 'Only administrators can create doctor accounts.',
+                'detail': 'You must be logged in as an administrator to perform this action.'
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        # Ensure role is set to doctor
+        request.data['role'] = User.UserRole.DOCTOR
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+
+        return Response({
+            'user': UserProfileSerializer(user).data,
+            'message': f'Doctor {user.get_full_name()} created successfully'
+        }, status=status.HTTP_201_CREATED)
+
+
+class NurseCreateView(generics.CreateAPIView):
+    """
+    Create new nurse user with complete profile (admin only)
+    """
+    queryset = User.objects.all()
+    serializer_class = NurseCreateSerializer
+    permission_classes = [IsAdminUser]
+
+    @extend_schema(
+        summary="Create new nurse",
+        description="Create a new nurse account with complete nursing credentials (admin only)",
+        request=NurseCreateSerializer,
+        responses={201: UserProfileSerializer}
+    )
+    def post(self, request, *args, **kwargs):
+        # Ensure only admins can create nurses
+        if not request.user.is_authenticated or not request.user.is_admin:
+            return Response({
+                'error': 'Only administrators can create nurse accounts.',
+                'detail': 'You must be logged in as an administrator to perform this action.'
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        # Ensure role is set to nurse
+        request.data['role'] = 'nurse'
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+
+        return Response({
+            'user': UserProfileSerializer(user).data,
+            'message': f'Nurse {user.get_full_name()} created successfully'
+        }, status=status.HTTP_201_CREATED)

@@ -50,6 +50,7 @@ LOCAL_APPS = [
     'apps.accounts',  # User accounts and authentication
     'apps.patients',  # Patient management
     'apps.doctors',   # Doctor management
+    'apps.staff',     # Staff management (nurses, admins, etc.)
     'apps.appointments',  # Appointment scheduling
     'apps.billing',   # Billing and invoicing
 ]
@@ -63,6 +64,9 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'apps.accounts.middleware.RoleProtectionMiddleware',
+    'apps.accounts.middleware.DataCompletenessMiddleware',
+    'apps.accounts.middleware.SecurityHeadersMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]

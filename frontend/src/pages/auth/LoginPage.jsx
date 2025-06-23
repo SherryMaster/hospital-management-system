@@ -136,6 +136,7 @@ const LoginPage = () => {
     <AuthLayout
       title="Welcome Back"
       subtitle="Sign in to your Hospital Management System account"
+      maxWidth="md"
     >
       <Box component="form" onSubmit={handleSubmit} noValidate>
         {/* Global Error Alert */}

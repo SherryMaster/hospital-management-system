@@ -40,11 +40,14 @@ THIRD_PARTY_APPS = [
 ]
 
 LOCAL_APPS = [
-    'accounts',
-    'appointments',
-    'medical_records',
-    'billing',
-    'notifications',
+    'apps.accounts',
+    'apps.doctors',
+    'apps.patients',
+    'apps.staff',
+    'apps.appointments',
+    'apps.medical_records',
+    'apps.billing',
+    'apps.notifications',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -57,8 +60,10 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'apps.accounts.middleware.RoleProtectionMiddleware',
+    'apps.accounts.middleware.DataCompletenessMiddleware',
+    'apps.accounts.middleware.SecurityHeadersMiddleware',
     'hospital_management.middleware.PerformanceMiddleware',
-    'hospital_management.middleware.SecurityHeadersMiddleware',
     'hospital_management.middleware.AuditLogMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',

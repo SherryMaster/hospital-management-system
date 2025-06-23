@@ -1,4 +1,4 @@
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, UserManager
 from django.db import models
 from django.core.validators import RegexValidator
 from phonenumber_field.modelfields import PhoneNumberField
@@ -6,11 +6,48 @@ from PIL import Image
 import os
 
 
+class CustomUserManager(UserManager):
+    """
+    Custom user manager for handling user creation with roles
+    """
+
+    def create_superuser(self, username, email=None, password=None, **extra_fields):
+        """
+        Create and save a superuser with admin role
+        """
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        extra_fields.setdefault('role', 'admin')  # Set role to admin for superusers
+
+        if extra_fields.get('is_staff') is not True:
+            raise ValueError('Superuser must have is_staff=True.')
+        if extra_fields.get('is_superuser') is not True:
+            raise ValueError('Superuser must have is_superuser=True.')
+
+        return self.create_user(username, email, password, **extra_fields)
+
+    def create_user(self, username, email=None, password=None, **extra_fields):
+        """
+        Create and save a regular user
+        """
+        if not username:
+            raise ValueError('The Username field must be set')
+
+        email = self.normalize_email(email)
+        user = self.model(username=username, email=email, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+
 class User(AbstractUser):
     """
     Custom User model extending Django's AbstractUser
     Supports multiple user roles: Admin, Doctor, Patient, Staff
     """
+
+    # Use custom manager
+    objects = CustomUserManager()
 
     class UserRole(models.TextChoices):
         ADMIN = 'admin', 'Administrator'

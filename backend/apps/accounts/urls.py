@@ -7,6 +7,8 @@ from .views import (
     PasswordChangeView,
     LogoutView,
     UserListView,
+    DoctorCreateView,
+    NurseCreateView,
 )
 
 app_name = 'accounts'
@@ -24,4 +26,6 @@ urlpatterns = [
 
     # User management endpoints (admin only)
     path('users/', UserListView.as_view(), name='user_list'),
+    path('users/create-doctor/', DoctorCreateView.as_view(), name='create_doctor'),
+    path('users/create-nurse/', NurseCreateView.as_view(), name='create_nurse'),
 ]

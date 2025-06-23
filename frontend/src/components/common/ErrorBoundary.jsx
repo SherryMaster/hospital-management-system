@@ -110,7 +110,11 @@ class ErrorBoundary extends React.Component {
             p: 3,
           }}
         >
-          <Card sx={{ maxWidth: 600, width: '100%' }}>
+          <Card sx={{
+            maxWidth: { xs: '100%', sm: 600, md: 800 },
+            width: '100%',
+            mx: 'auto'
+          }}>
             <CardContent>
               <Box sx={{ textAlign: 'center', mb: 3 }}>
                 <ErrorIcon sx={{ fontSize: 64, color: 'error.main', mb: 2 }} />
