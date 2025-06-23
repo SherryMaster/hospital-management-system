@@ -81,7 +81,7 @@ const Sidebar = ({ user, onItemClick }) => {
         text: 'Dashboard',
         icon: <DashboardIcon />,
         path: '/dashboard',
-        roles: ['admin', 'doctor', 'nurse', 'receptionist', 'pharmacist'],
+        roles: ['admin', 'doctor', 'nurse', 'receptionist', 'pharmacist', 'patient'],
       },
     ];
 
