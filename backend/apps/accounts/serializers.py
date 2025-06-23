@@ -13,9 +13,9 @@ except ImportError:
     Patient = None
 
 try:
-    from apps.doctors.models import Doctor
+    from apps.doctors.models import Doctor, Department
 except ImportError:
-    Doctor = None
+    Doctor = Department = None
 
 try:
     from apps.staff.models import Nurse, Administrator, Receptionist, Pharmacist
@@ -576,6 +576,13 @@ class AdminUserCreateSerializer(serializers.ModelSerializer):
     )
     phone_number = PhoneNumberField(required=True)
 
+    # Date field with proper format
+    date_of_birth = serializers.DateField(
+        input_formats=['%Y-%m-%d'],
+        required=True,
+        help_text="Date format: YYYY-MM-DD"
+    )
+
     # Role selection field
     role = serializers.ChoiceField(
         choices=User.UserRole.choices,
@@ -603,7 +610,11 @@ class AdminUserCreateSerializer(serializers.ModelSerializer):
 
     # Doctor-specific fields
     license_number = serializers.CharField(max_length=50, required=False, allow_blank=True)
-    department_name = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    department = serializers.PrimaryKeyRelatedField(
+        queryset=Department.objects.filter(is_active=True) if Department else [],
+        required=False,
+        allow_null=True
+    )
     specializations = serializers.ListField(
         child=serializers.CharField(max_length=100),
         required=False,
@@ -659,14 +670,14 @@ class AdminUserCreateSerializer(serializers.ModelSerializer):
         fields = [
             # Basic user fields
             'username', 'email', 'password', 'password_confirm', 'first_name', 'last_name',
-            'role', 'phone_number', 'date_of_birth', 'gender', 'address', 'city', 'state',
+            'role', 'phone_number', 'date_of_birth', 'gender', 'address_line_1', 'address_line_2', 'city', 'state',
             'postal_code', 'country', 'emergency_contact_name', 'emergency_contact_phone',
             'emergency_contact_relationship',
             # Patient fields
             'blood_type', 'height', 'weight', 'marital_status', 'allergies', 'chronic_conditions',
             'current_medications', 'family_medical_history', 'surgical_history',
             # Doctor fields
-            'license_number', 'department_name', 'specializations', 'medical_school',
+            'license_number', 'department', 'specializations', 'medical_school',
             'graduation_year', 'years_of_experience', 'consultation_fee', 'employment_status',
             # Nurse fields
             'nursing_level', 'nursing_school', 'shift_preference', 'unit',
@@ -691,6 +702,27 @@ class AdminUserCreateSerializer(serializers.ModelSerializer):
         role = attrs.get('role')
         if not role:
             raise serializers.ValidationError({'role': 'User role is required.'})
+
+        # Validate date of birth
+        if attrs.get('date_of_birth'):
+            from datetime import date, datetime
+            try:
+                if isinstance(attrs['date_of_birth'], str):
+                    birth_date = datetime.strptime(attrs['date_of_birth'], '%Y-%m-%d').date()
+                else:
+                    birth_date = attrs['date_of_birth']
+
+                today = date.today()
+                age = today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
+
+                if birth_date > today:
+                    raise serializers.ValidationError({'date_of_birth': 'Date of birth cannot be in the future.'})
+                if age > 150:
+                    raise serializers.ValidationError({'date_of_birth': 'Invalid date of birth.'})
+                if age < 0:
+                    raise serializers.ValidationError({'date_of_birth': 'Date of birth cannot be in the future.'})
+            except ValueError:
+                raise serializers.ValidationError({'date_of_birth': 'Invalid date format. Use YYYY-MM-DD.'})
 
         # Role-specific validation
         if role == User.UserRole.PATIENT:
@@ -806,7 +838,7 @@ class AdminUserCreateSerializer(serializers.ModelSerializer):
         """Extract doctor-specific fields from validated data"""
         doctor_fields = {}
         doctor_field_names = [
-            'license_number', 'department_name', 'specializations', 'medical_school',
+            'license_number', 'department', 'specializations', 'medical_school',
             'graduation_year', 'years_of_experience', 'consultation_fee', 'employment_status'
         ]
         for field in doctor_field_names:
@@ -871,12 +903,8 @@ class AdminUserCreateSerializer(serializers.ModelSerializer):
 
     def _create_doctor_profile(self, user, doctor_fields):
         """Create doctor profile with provided fields"""
-        # Handle department
-        department = None
-        if doctor_fields.get('department_name'):
-            department, _ = Department.objects.get_or_create(
-                name=doctor_fields['department_name']
-            )
+        # Get department (already validated as PrimaryKeyRelatedField)
+        department = doctor_fields.get('department')
 
         doctor = Doctor.objects.create(
             user=user,

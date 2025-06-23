@@ -726,7 +726,7 @@ export const medicalRecordsService = {
 export const departmentService = {
   getDepartments: async (params = {}) => {
     try {
-      const response = await api.get('/departments/', { params });
+      const response = await api.get('/doctors/departments/', { params });
       return { data: response.data, error: null };
     } catch (error) {
       return { data: null, error: handleApiError(error) };
@@ -735,7 +735,7 @@ export const departmentService = {
 
   getDepartment: async (departmentId) => {
     try {
-      const response = await api.get(`/departments/${departmentId}/`);
+      const response = await api.get(`/doctors/departments/${departmentId}/`);
       return { data: response.data, error: null };
     } catch (error) {
       return { data: null, error: handleApiError(error) };
@@ -744,7 +744,7 @@ export const departmentService = {
 
   createDepartment: async (departmentData) => {
     try {
-      const response = await api.post('/departments/', departmentData);
+      const response = await api.post('/doctors/departments/', departmentData);
       return { data: response.data, error: null };
     } catch (error) {
       return { data: null, error: handleApiError(error) };
@@ -753,7 +753,7 @@ export const departmentService = {
 
   updateDepartment: async (departmentId, departmentData) => {
     try {
-      const response = await api.patch(`/departments/${departmentId}/`, departmentData);
+      const response = await api.patch(`/doctors/departments/${departmentId}/`, departmentData);
       return { data: response.data, error: null };
     } catch (error) {
       return { data: null, error: handleApiError(error) };
@@ -762,7 +762,7 @@ export const departmentService = {
 
   deleteDepartment: async (departmentId) => {
     try {
-      await api.delete(`/departments/${departmentId}/`);
+      await api.delete(`/doctors/departments/${departmentId}/`);
       return { data: { message: 'Department deleted successfully' }, error: null };
     } catch (error) {
       return { data: null, error: handleApiError(error) };

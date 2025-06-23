@@ -30,6 +30,7 @@ import {
   Analytics as AnalyticsIcon,
   MedicalServices as MedicalServicesIcon,
   Assignment as AssignmentIcon,
+  Business as BusinessIcon,
 } from '@mui/icons-material';
 
 const Sidebar = ({ user, onItemClick }) => {
@@ -90,6 +91,12 @@ const Sidebar = ({ user, onItemClick }) => {
         text: 'Users',
         icon: <PeopleIcon />,
         path: '/users',
+        roles: ['admin'],
+      },
+      {
+        text: 'Departments',
+        icon: <BusinessIcon />,
+        path: '/departments',
         roles: ['admin'],
       },
       {

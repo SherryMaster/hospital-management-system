@@ -22,6 +22,7 @@ import {
   Box,
 } from '@mui/material';
 import { DatePicker, TimePicker, DateTimePicker } from '@mui/x-date-pickers';
+import dayjs from 'dayjs';
 
 const FormField = ({
   type = 'text',
@@ -50,8 +51,18 @@ const FormField = ({
       onChange({ target: { name, value: newValue } });
     } else if (type === 'checkbox' || type === 'switch') {
       onChange({ target: { name, value: event.target.checked } });
-    } else if (type === 'date' || type === 'time' || type === 'datetime') {
-      onChange({ target: { name, value: newValue } });
+    } else if (type === 'date') {
+      // Format date to YYYY-MM-DD string format for the backend
+      const formattedValue = newValue ? newValue.format('YYYY-MM-DD') : '';
+      onChange({ target: { name, value: formattedValue } });
+    } else if (type === 'time') {
+      // Format time to HH:mm string format for the backend
+      const formattedValue = newValue ? newValue.format('HH:mm') : '';
+      onChange({ target: { name, value: formattedValue } });
+    } else if (type === 'datetime') {
+      // Format datetime to ISO string format for the backend
+      const formattedValue = newValue ? newValue.toISOString() : '';
+      onChange({ target: { name, value: formattedValue } });
     } else {
       onChange(event);
     }
@@ -202,7 +213,7 @@ const FormField = ({
         return (
           <DatePicker
             label={label}
-            value={value}
+            value={value ? dayjs(value) : null}
             onChange={handleChange}
             disabled={disabled}
             slotProps={{
@@ -226,7 +237,7 @@ const FormField = ({
         return (
           <TimePicker
             label={label}
-            value={value}
+            value={value ? dayjs(value, 'HH:mm') : null}
             onChange={handleChange}
             disabled={disabled}
             slotProps={{
@@ -250,7 +261,7 @@ const FormField = ({
         return (
           <DateTimePicker
             label={label}
-            value={value}
+            value={value ? dayjs(value) : null}
             onChange={handleChange}
             disabled={disabled}
             slotProps={{

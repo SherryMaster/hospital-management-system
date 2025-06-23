@@ -36,6 +36,7 @@ import {
   MoreVert as MoreVertIcon,
   Refresh as RefreshIcon,
   Settings as SettingsIcon,
+  Business as BusinessIcon,
 } from '@mui/icons-material';
 import { MainLayout } from '../../components/layout';
 import { useAuth } from '../../contexts/AuthContext';
@@ -217,6 +218,10 @@ const AdminDashboard = () => {
                 <PeopleIcon sx={{ mr: 1 }} />
                 User Management
               </MenuItem>
+              <MenuItem onClick={() => { handleMenuClose(); handleNavigation('/departments'); }}>
+                <BusinessIcon sx={{ mr: 1 }} />
+                Department Management
+              </MenuItem>
             </Menu>
           </Box>
         </Box>
@@ -397,6 +402,17 @@ const AdminDashboard = () => {
                       onClick={() => handleNavigation('/users')}
                     >
                       Add User
+                    </Button>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Button
+                      fullWidth
+                      variant="outlined"
+                      startIcon={<BusinessIcon />}
+                      sx={{ mb: 1 }}
+                      onClick={() => handleNavigation('/departments')}
+                    >
+                      Departments
                     </Button>
                   </Grid>
                   <Grid item xs={6}>

@@ -105,13 +105,24 @@ class DepartmentDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     @extend_schema(
         summary="Delete department",
-        description="Soft delete department (admin only)"
+        description="Permanently delete department (admin only)"
     )
     def delete(self, request, *args, **kwargs):
-        # Soft delete instead of hard delete
+        # Hard delete - completely remove the department
         department = self.get_object()
-        department.is_active = False
-        department.save()
+
+        # Check if department has any active doctors
+        if department.doctors.filter(is_active=True).exists():
+            return Response(
+                {
+                    'error': 'Cannot delete department',
+                    'detail': 'This department has active doctors assigned to it. Please reassign or remove the doctors first.'
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Proceed with deletion
+        department.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

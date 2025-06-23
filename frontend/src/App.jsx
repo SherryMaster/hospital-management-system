@@ -29,6 +29,7 @@ import { AppointmentBooking, AppointmentCalendar, AppointmentManagement } from '
 import { PatientPortal, PatientProfile, MyAppointments, MyInvoices } from './pages/patient';
 import { DoctorPortal } from './pages/doctor';
 import UsersPage from './pages/admin/UsersPage';
+import DepartmentsPage from './pages/admin/DepartmentsPage';
 import PatientsPage from './pages/PatientsPage';
 import DoctorsPage from './pages/DoctorsPage';
 import AppointmentsPage from './pages/AppointmentsPage';
@@ -88,6 +89,14 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute requiredRoles={['admin']}>
             <UsersPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/departments"
+        element={
+          <ProtectedRoute requiredRoles={['admin']}>
+            <DepartmentsPage />
           </ProtectedRoute>
         }
       />

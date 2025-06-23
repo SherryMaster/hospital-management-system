@@ -17,6 +17,7 @@ import {
   Cake,
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs from 'dayjs';
 
 const PersonalInfoStep = ({ formData, onChange, errors = {} }) => {
   const [showPassword, setShowPassword] = React.useState(false);
@@ -28,7 +29,9 @@ const PersonalInfoStep = ({ formData, onChange, errors = {} }) => {
   };
 
   const handleDateChange = (name, value) => {
-    onChange(name, value);
+    // Format the date to YYYY-MM-DD string format for the backend
+    const formattedValue = value ? value.format('YYYY-MM-DD') : '';
+    onChange(name, formattedValue);
   };
 
   const togglePasswordVisibility = () => {
@@ -145,7 +148,7 @@ const PersonalInfoStep = ({ formData, onChange, errors = {} }) => {
         <Grid item xs={12} sm={6}>
           <DatePicker
             label="Date of Birth"
-            value={formData.date_of_birth || null}
+            value={formData.date_of_birth ? dayjs(formData.date_of_birth) : null}
             onChange={(value) => handleDateChange('date_of_birth', value)}
             slotProps={{
               textField: {
