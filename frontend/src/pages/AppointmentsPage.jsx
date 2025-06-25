@@ -41,13 +41,20 @@ import {
   CalendarToday as CalendarIcon,
   Person as PersonIcon,
   MedicalServices as DoctorIcon,
+  Visibility as ViewIcon,
+  Phone as PhoneIcon,
+  Email as EmailIcon,
+  LocationOn as LocationIcon,
+  AccessTime as TimeIcon,
 } from '@mui/icons-material';
 import { MainLayout } from '../components/layout';
 import { useAuth } from '../contexts/AuthContext';
 import { useAppointments, useDoctors, usePatients } from '../hooks/useApi';
+import { useNavigate } from 'react-router-dom';
 
 const AppointmentsPage = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, isAuthenticated, isLoading } = useAuth();
+  const navigate = useNavigate();
   const {
     appointments,
     pagination,
@@ -69,8 +76,10 @@ const AppointmentsPage = () => {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [appointmentToCancel, setAppointmentToCancel] = useState(null);
   const [appointmentToEdit, setAppointmentToEdit] = useState(null);
+  const [appointmentToView, setAppointmentToView] = useState(null);
   const [formData, setFormData] = useState({
     patient: '',
     doctor: '',
@@ -81,11 +90,37 @@ const AppointmentsPage = () => {
     notes: '',
   });
 
+  // Check authentication and redirect if needed
   useEffect(() => {
-    loadAppointments();
-    fetchDoctors();
-    fetchPatients();
-  }, []);
+    if (!isLoading && !isAuthenticated) {
+      console.log('User not authenticated, redirecting to login');
+      navigate('/login');
+      return;
+    }
+  }, [isAuthenticated, isLoading, navigate]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadAppointments();
+      fetchDoctors();
+      fetchPatients();
+
+      // Debug: Check authentication status
+      const checkAuth = () => {
+        const token = localStorage.getItem('hospital_auth_token');
+        const refreshToken = localStorage.getItem('hospital_refresh_token');
+        console.log('Auth Debug:', {
+          hasToken: !!token,
+          hasRefreshToken: !!refreshToken,
+          token: token ? token.substring(0, 20) + '...' : 'None',
+          user: user,
+          isAuthenticated: isAuthenticated,
+          allLocalStorageKeys: Object.keys(localStorage)
+        });
+      };
+      checkAuth();
+    }
+  }, [isAuthenticated]);
 
   const loadAppointments = () => {
     const params = {};
@@ -93,6 +128,7 @@ const AppointmentsPage = () => {
     if (statusFilter) params.status = statusFilter;
     if (doctorFilter) params.doctor = doctorFilter;
     if (dateFilter) params.date = dateFilter;
+    console.log('Loading appointments with params:', params);
     fetchAppointments(params);
   };
 
@@ -127,6 +163,11 @@ const AppointmentsPage = () => {
     setEditDialogOpen(true);
   };
 
+  const handleViewClick = (appointment) => {
+    setAppointmentToView(appointment);
+    setDetailsDialogOpen(true);
+  };
+
   const handleCancelClick = (appointment) => {
     setAppointmentToCancel(appointment);
     setCancelDialogOpen(true);
@@ -144,21 +185,31 @@ const AppointmentsPage = () => {
   };
 
   const handleFormSubmit = async () => {
-    if (appointmentToEdit) {
-      // Update existing appointment
-      const result = await updateAppointment(appointmentToEdit.id, formData);
-      if (result.data) {
-        loadAppointments();
-        setEditDialogOpen(false);
-        setAppointmentToEdit(null);
+    try {
+      if (appointmentToEdit) {
+        // Update existing appointment
+        console.log('Updating appointment with data:', formData);
+        const result = await updateAppointment(appointmentToEdit.id, formData);
+        if (result.data) {
+          loadAppointments();
+          setEditDialogOpen(false);
+          setAppointmentToEdit(null);
+        } else if (result.error) {
+          console.error('Update error:', result.error);
+        }
+      } else {
+        // Create new appointment
+        console.log('Creating appointment with data:', formData);
+        const result = await createAppointment(formData);
+        if (result.data) {
+          loadAppointments();
+          setCreateDialogOpen(false);
+        } else if (result.error) {
+          console.error('Create error:', result.error);
+        }
       }
-    } else {
-      // Create new appointment
-      const result = await createAppointment(formData);
-      if (result.data) {
-        loadAppointments();
-        setCreateDialogOpen(false);
-      }
+    } catch (error) {
+      console.error('Form submission error:', error);
     }
   };
 
@@ -197,6 +248,22 @@ const AppointmentsPage = () => {
       return timeString;
     }
   };
+
+  // Show loading while checking authentication
+  if (isLoading) {
+    return (
+      <MainLayout>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+          <Typography>Loading...</Typography>
+        </Box>
+      </MainLayout>
+    );
+  }
+
+  // Don't render if not authenticated (will redirect)
+  if (!isAuthenticated) {
+    return null;
+  }
 
   return (
     <MainLayout user={user} onLogout={logout}>
@@ -301,6 +368,8 @@ const AppointmentsPage = () => {
           </CardContent>
         </Card>
 
+
+
         {/* Error Alert */}
         {error && (
           <Alert severity="error" sx={{ mb: 3 }}>
@@ -332,21 +401,21 @@ const AppointmentsPage = () => {
                   <TableBody>
                     {appointments.map((appointment) => (
                       <TableRow key={appointment.id}>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <Avatar sx={{ bgcolor: 'primary.main' }}>
-                              <PersonIcon />
-                            </Avatar>
-                            <Box>
-                              <Typography variant="body2" fontWeight="medium">
-                                {appointment.patient?.full_name || 'Unknown Patient'}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                ID: {appointment.patient?.patient_id}
-                              </Typography>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                              <Avatar sx={{ bgcolor: 'primary.main' }}>
+                                <PersonIcon />
+                              </Avatar>
+                              <Box>
+                                <Typography variant="body2" fontWeight="medium">
+                                  {appointment.patient?.full_name || 'Unknown Patient'}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  ID: {appointment.patient?.patient_id}
+                                </Typography>
+                              </Box>
                             </Box>
-                          </Box>
-                        </TableCell>
+                          </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                             <Avatar sx={{ bgcolor: 'secondary.main' }}>
@@ -393,7 +462,15 @@ const AppointmentsPage = () => {
                         <TableCell align="right">
                           <IconButton
                             size="small"
+                            onClick={() => handleViewClick(appointment)}
+                            title="View Details"
+                          >
+                            <ViewIcon />
+                          </IconButton>
+                          <IconButton
+                            size="small"
                             onClick={() => handleEditClick(appointment)}
+                            title="Edit Appointment"
                           >
                             <EditIcon />
                           </IconButton>
@@ -402,6 +479,7 @@ const AppointmentsPage = () => {
                               size="small"
                               color="error"
                               onClick={() => handleCancelClick(appointment)}
+                              title="Cancel Appointment"
                             >
                               <CancelIcon />
                             </IconButton>
@@ -683,6 +761,246 @@ const AppointmentsPage = () => {
             <Button onClick={handleCancelConfirm} color="error" variant="contained">
               Cancel Appointment
             </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Appointment Details Dialog */}
+        <Dialog
+          open={detailsDialogOpen}
+          onClose={() => {
+            setDetailsDialogOpen(false);
+            setAppointmentToView(null);
+          }}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <CalendarIcon color="primary" />
+              <Typography variant="h6">Appointment Details</Typography>
+            </Box>
+          </DialogTitle>
+          <DialogContent>
+            {appointmentToView && (
+              <Box sx={{ pt: 2 }}>
+                <Grid container spacing={3}>
+                  {/* Patient Information */}
+                  <Grid item xs={12} md={6}>
+                    <Card variant="outlined">
+                      <CardContent>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                          <Avatar sx={{ bgcolor: 'primary.main' }}>
+                            <PersonIcon />
+                          </Avatar>
+                          <Typography variant="h6">Patient Information</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                          <Typography variant="body1">
+                            <strong>Name:</strong> {appointmentToView.patient?.full_name || 'N/A'}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            <strong>Patient ID:</strong> {appointmentToView.patient?.patient_id || 'N/A'}
+                          </Typography>
+                          {appointmentToView.patient?.phone && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <PhoneIcon fontSize="small" color="action" />
+                              <Typography variant="body2">{appointmentToView.patient.phone}</Typography>
+                            </Box>
+                          )}
+                          {appointmentToView.patient?.email && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <EmailIcon fontSize="small" color="action" />
+                              <Typography variant="body2">{appointmentToView.patient.email}</Typography>
+                            </Box>
+                          )}
+                          {appointmentToView.patient?.address && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <LocationIcon fontSize="small" color="action" />
+                              <Typography variant="body2">{appointmentToView.patient.address}</Typography>
+                            </Box>
+                          )}
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+
+                  {/* Doctor Information */}
+                  <Grid item xs={12} md={6}>
+                    <Card variant="outlined">
+                      <CardContent>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                          <Avatar sx={{ bgcolor: 'secondary.main' }}>
+                            <DoctorIcon />
+                          </Avatar>
+                          <Typography variant="h6">Doctor Information</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                          <Typography variant="body1">
+                            <strong>Name:</strong> Dr. {appointmentToView.doctor?.full_name || 'N/A'}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            <strong>Department:</strong> {appointmentToView.department?.name || 'N/A'}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            <strong>Specialization:</strong> {appointmentToView.doctor?.specialization || 'N/A'}
+                          </Typography>
+                          {appointmentToView.doctor?.phone && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <PhoneIcon fontSize="small" color="action" />
+                              <Typography variant="body2">{appointmentToView.doctor.phone}</Typography>
+                            </Box>
+                          )}
+                          {appointmentToView.doctor?.email && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <EmailIcon fontSize="small" color="action" />
+                              <Typography variant="body2">{appointmentToView.doctor.email}</Typography>
+                            </Box>
+                          )}
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+
+                  {/* Appointment Details */}
+                  <Grid item xs={12}>
+                    <Card variant="outlined">
+                      <CardContent>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                          <TimeIcon color="primary" />
+                          <Typography variant="h6">Appointment Details</Typography>
+                        </Box>
+                        <Grid container spacing={2}>
+                          <Grid item xs={12} sm={6} md={3}>
+                            <Typography variant="body2" color="text.secondary">Date</Typography>
+                            <Typography variant="body1">{formatDate(appointmentToView.appointment_date)}</Typography>
+                          </Grid>
+                          <Grid item xs={12} sm={6} md={3}>
+                            <Typography variant="body2" color="text.secondary">Time</Typography>
+                            <Typography variant="body1">{formatTime(appointmentToView.appointment_time)}</Typography>
+                          </Grid>
+                          <Grid item xs={12} sm={6} md={3}>
+                            <Typography variant="body2" color="text.secondary">Type</Typography>
+                            <Chip
+                              label={appointmentToView.appointment_type || 'consultation'}
+                              size="small"
+                              variant="outlined"
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={6} md={3}>
+                            <Typography variant="body2" color="text.secondary">Status</Typography>
+                            <Chip
+                              label={appointmentToView.status}
+                              size="small"
+                              color={getStatusColor(appointmentToView.status)}
+                              variant="outlined"
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={6}>
+                            <Typography variant="body2" color="text.secondary">Appointment ID</Typography>
+                            <Typography variant="body1">{appointmentToView.appointment_id || appointmentToView.id}</Typography>
+                          </Grid>
+                          <Grid item xs={12} sm={6}>
+                            <Typography variant="body2" color="text.secondary">Created</Typography>
+                            <Typography variant="body1">
+                              {appointmentToView.created_at ? formatDate(appointmentToView.created_at) : 'N/A'}
+                            </Typography>
+                          </Grid>
+                        </Grid>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+
+                  {/* Medical Information */}
+                  <Grid item xs={12}>
+                    <Card variant="outlined">
+                      <CardContent>
+                        <Typography variant="h6" gutterBottom>Medical Information</Typography>
+                        <Grid container spacing={2}>
+                          <Grid item xs={12}>
+                            <Typography variant="body2" color="text.secondary">Chief Complaint</Typography>
+                            <Typography variant="body1" sx={{ mt: 1 }}>
+                              {appointmentToView.chief_complaint || 'No complaint specified'}
+                            </Typography>
+                          </Grid>
+                          {appointmentToView.notes && (
+                            <Grid item xs={12}>
+                              <Typography variant="body2" color="text.secondary">Notes</Typography>
+                              <Typography variant="body1" sx={{ mt: 1 }}>
+                                {appointmentToView.notes}
+                              </Typography>
+                            </Grid>
+                          )}
+                        </Grid>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+
+                  {/* Cancellation Information */}
+                  {appointmentToView.status === 'cancelled' && (
+                    <Grid item xs={12}>
+                      <Card variant="outlined" sx={{ borderColor: 'error.main' }}>
+                        <CardContent>
+                          <Typography variant="h6" color="error" gutterBottom>Cancellation Information</Typography>
+                          <Grid container spacing={2}>
+                            <Grid item xs={12} sm={6}>
+                              <Typography variant="body2" color="text.secondary">Cancelled At</Typography>
+                              <Typography variant="body1">
+                                {appointmentToView.cancelled_at ? formatDate(appointmentToView.cancelled_at) : 'N/A'}
+                              </Typography>
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                              <Typography variant="body2" color="text.secondary">Cancelled By</Typography>
+                              <Typography variant="body1">
+                                {appointmentToView.cancelled_by?.full_name || 'N/A'}
+                              </Typography>
+                            </Grid>
+                            <Grid item xs={12}>
+                              <Typography variant="body2" color="text.secondary">Reason</Typography>
+                              <Typography variant="body1">
+                                {appointmentToView.cancellation_reason || 'No reason provided'}
+                              </Typography>
+                            </Grid>
+                          </Grid>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  )}
+                </Grid>
+              </Box>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => {
+              setDetailsDialogOpen(false);
+              setAppointmentToView(null);
+            }}>
+              Close
+            </Button>
+            {appointmentToView && appointmentToView.status !== 'cancelled' && appointmentToView.status !== 'completed' && (
+              <>
+                <Button
+                  onClick={() => {
+                    setDetailsDialogOpen(false);
+                    handleEditClick(appointmentToView);
+                  }}
+                  variant="outlined"
+                  startIcon={<EditIcon />}
+                >
+                  Edit
+                </Button>
+                <Button
+                  onClick={() => {
+                    setDetailsDialogOpen(false);
+                    handleCancelClick(appointmentToView);
+                  }}
+                  color="error"
+                  variant="outlined"
+                  startIcon={<CancelIcon />}
+                >
+                  Cancel
+                </Button>
+              </>
+            )}
           </DialogActions>
         </Dialog>
       </Box>

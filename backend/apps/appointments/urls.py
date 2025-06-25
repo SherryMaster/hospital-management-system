@@ -7,11 +7,15 @@ from .views import (
     AppointmentCalendarView,
     AppointmentCancelView,
     TodayAppointmentsView,
+    debug_appointments,
 )
 
 app_name = 'appointments'
 
 urlpatterns = [
+    # Debug endpoint
+    path('debug/', debug_appointments, name='debug_appointments'),
+
     # Appointment endpoints
     path('', AppointmentListCreateView.as_view(), name='appointment_list_create'),
     path('<int:pk>/', AppointmentDetailView.as_view(), name='appointment_detail'),

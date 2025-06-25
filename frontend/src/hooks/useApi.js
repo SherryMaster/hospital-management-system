@@ -460,9 +460,13 @@ export const useAppointments = () => {
     const { data, error: apiError } = await appointmentService.getAppointments(params);
 
     if (apiError) {
+      console.error('Fetch appointments error:', apiError);
       setError(apiError.message);
     } else {
-      setAppointments(data.results || data);
+      console.log('Fetched appointments data:', data);
+      const appointmentsList = data.results || data;
+      console.log('Setting appointments:', appointmentsList);
+      setAppointments(appointmentsList);
       setPagination({
         count: data.count,
         next: data.next,

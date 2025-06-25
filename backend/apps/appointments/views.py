@@ -361,6 +361,37 @@ class AppointmentCancelView(APIView):
             )
 
 
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def debug_appointments(request):
+    """Debug endpoint to check appointments data"""
+    try:
+        appointments = Appointment.objects.all()
+        data = []
+        for apt in appointments:
+            data.append({
+                'id': apt.id,
+                'patient_name': str(apt.patient) if apt.patient else 'No Patient',
+                'doctor_name': str(apt.doctor) if apt.doctor else 'No Doctor',
+                'date': str(apt.appointment_date),
+                'time': str(apt.appointment_time),
+                'status': apt.status,
+                'type': apt.appointment_type,
+            })
+
+        return Response({
+            'user': {
+                'email': request.user.email,
+                'role': request.user.role,
+                'is_authenticated': request.user.is_authenticated,
+            },
+            'appointments_count': appointments.count(),
+            'appointments': data
+        })
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
+
+
 class TodayAppointmentsView(generics.ListAPIView):
     """
     Today's appointments view

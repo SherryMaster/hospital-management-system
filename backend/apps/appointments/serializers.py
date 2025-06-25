@@ -117,12 +117,13 @@ class AppointmentUpdateSerializer(serializers.ModelSerializer):
     """
     Serializer for updating appointments
     """
-    
+
     class Meta:
         model = Appointment
         fields = [
-            'appointment_date', 'appointment_time', 'duration', 'appointment_type',
-            'status', 'priority', 'chief_complaint', 'symptoms', 'notes'
+            'patient', 'doctor', 'department', 'appointment_date', 'appointment_time',
+            'duration', 'appointment_type', 'status', 'priority', 'chief_complaint',
+            'symptoms', 'notes'
         ]
     
     def validate_appointment_date(self, value):
@@ -137,11 +138,37 @@ class AppointmentUpdateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Appointments can only be scheduled between 9:00 AM and 5:00 PM.")
         return value
     
+    def validate(self, data):
+        """Validate appointment data"""
+        # Check for conflicts if doctor is being changed
+        if 'doctor' in data and 'appointment_date' in data and 'appointment_time' in data:
+            doctor = data['doctor']
+            appointment_date = data['appointment_date']
+            appointment_time = data['appointment_time']
+
+            # Check for existing appointments at the same time (excluding current appointment)
+            existing_appointments = Appointment.objects.filter(
+                doctor=doctor,
+                appointment_date=appointment_date,
+                appointment_time=appointment_time,
+                status__in=['scheduled', 'confirmed', 'in_progress']
+            )
+
+            if self.instance:
+                existing_appointments = existing_appointments.exclude(id=self.instance.id)
+
+            if existing_appointments.exists():
+                raise serializers.ValidationError(
+                    "Doctor already has an appointment at this time."
+                )
+
+        return data
+
     def validate_status(self, value):
         """Validate status transitions"""
         if self.instance:
             current_status = self.instance.status
-            
+
             # Define allowed status transitions
             allowed_transitions = {
                 'scheduled': ['confirmed', 'cancelled', 'no_show'],
@@ -152,12 +179,12 @@ class AppointmentUpdateSerializer(serializers.ModelSerializer):
                 'no_show': [],   # Cannot change from no_show
                 'rescheduled': []  # Cannot change from rescheduled
             }
-            
+
             if value != current_status and value not in allowed_transitions.get(current_status, []):
                 raise serializers.ValidationError(
                     f"Cannot change status from '{current_status}' to '{value}'"
                 )
-        
+
         return value
 
 
@@ -169,15 +196,54 @@ class AppointmentListSerializer(serializers.ModelSerializer):
     doctor_name = serializers.ReadOnlyField(source='doctor.get_full_name')
     department_name = serializers.ReadOnlyField(source='department.name')
     duration_display = serializers.ReadOnlyField(source='get_duration_display')
-    
+
+    # Include nested patient and doctor objects for editing
+    patient = serializers.SerializerMethodField()
+    doctor = serializers.SerializerMethodField()
+    department = serializers.SerializerMethodField()
+
     class Meta:
         model = Appointment
         fields = [
-            'id', 'appointment_id', 'patient_name', 'doctor_name', 'department_name',
-            'appointment_date', 'appointment_time', 'duration_display',
-            'appointment_type', 'status', 'priority', 'chief_complaint',
-            'is_today', 'is_upcoming'
+            'id', 'appointment_id', 'patient', 'patient_name', 'doctor', 'doctor_name',
+            'department', 'department_name', 'appointment_date', 'appointment_time',
+            'duration_display', 'appointment_type', 'status', 'priority', 'chief_complaint',
+            'notes', 'is_today', 'is_upcoming'
         ]
+
+    def get_patient(self, obj):
+        """Return patient data for editing"""
+        if obj.patient:
+            return {
+                'id': obj.patient.id,
+                'full_name': obj.patient.get_full_name(),
+                'patient_id': obj.patient.patient_id,
+                'phone': getattr(obj.patient, 'phone', ''),
+                'email': getattr(obj.patient.user, 'email', ''),
+                'address': getattr(obj.patient, 'address', '')
+            }
+        return None
+
+    def get_doctor(self, obj):
+        """Return doctor data for editing"""
+        if obj.doctor:
+            return {
+                'id': obj.doctor.id,
+                'full_name': obj.doctor.get_full_name(),
+                'specialization': getattr(obj.doctor, 'specialization', ''),
+                'phone': getattr(obj.doctor, 'phone', ''),
+                'email': getattr(obj.doctor, 'email', '')
+            }
+        return None
+
+    def get_department(self, obj):
+        """Return department data"""
+        if obj.department:
+            return {
+                'id': obj.department.id,
+                'name': obj.department.name
+            }
+        return None
 
 
 class AppointmentCalendarSerializer(serializers.ModelSerializer):
