@@ -105,20 +105,7 @@ const AppointmentsPage = () => {
       fetchDoctors();
       fetchPatients();
 
-      // Debug: Check authentication status
-      const checkAuth = () => {
-        const token = localStorage.getItem('hospital_auth_token');
-        const refreshToken = localStorage.getItem('hospital_refresh_token');
-        console.log('Auth Debug:', {
-          hasToken: !!token,
-          hasRefreshToken: !!refreshToken,
-          token: token ? token.substring(0, 20) + '...' : 'None',
-          user: user,
-          isAuthenticated: isAuthenticated,
-          allLocalStorageKeys: Object.keys(localStorage)
-        });
-      };
-      checkAuth();
+
     }
   }, [isAuthenticated]);
 
