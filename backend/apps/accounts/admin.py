@@ -23,8 +23,7 @@ class PatientInline(admin.StackedInline):
     verbose_name_plural = 'Patient Profile'
     fields = [
         'patient_id', 'blood_type', 'marital_status', 'height', 'weight',
-        'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship',
-        'allergies', 'medical_history', 'is_active'
+        'allergies', 'chronic_conditions', 'current_medications', 'is_active'
     ]
     readonly_fields = ['patient_id']
 

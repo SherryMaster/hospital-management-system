@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from phonenumber_field.serializerfields import PhoneNumberField
 from .models import Department, Specialization, Doctor
 from apps.accounts.serializers import UserProfileSerializer
 
@@ -147,16 +148,17 @@ class DoctorListSerializer(serializers.ModelSerializer):
     """
     Serializer for Doctor list view
     """
+    user = UserProfileSerializer(read_only=True)
     full_name = serializers.ReadOnlyField(source='get_full_name')
     department_name = serializers.ReadOnlyField(source='department.name')
     specializations_list = serializers.ReadOnlyField(source='get_specializations_list')
     email = serializers.ReadOnlyField(source='user.email')
-    phone = serializers.ReadOnlyField(source='user.phone_number')
-    
+    phone = PhoneNumberField(source='user.phone_number', read_only=True)
+
     class Meta:
         model = Doctor
         fields = [
-            'id', 'doctor_id', 'full_name', 'email', 'phone', 'department_name',
+            'id', 'user', 'doctor_id', 'full_name', 'email', 'phone', 'department_name',
             'specializations_list', 'years_of_experience', 'consultation_fee',
             'is_accepting_patients', 'employment_status', 'is_active'
         ]

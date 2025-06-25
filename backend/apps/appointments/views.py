@@ -308,6 +308,59 @@ class AppointmentCalendarView(generics.ListAPIView):
         return super().get(request, *args, **kwargs)
 
 
+class AppointmentCancelView(APIView):
+    """
+    Cancel an appointment with reason
+    """
+    permission_classes = [CanManageAppointments]
+
+    @extend_schema(
+        summary="Cancel appointment",
+        description="Cancel an appointment with a reason",
+        request={
+            'application/json': {
+                'type': 'object',
+                'properties': {
+                    'reason': {
+                        'type': 'string',
+                        'description': 'Reason for cancellation'
+                    }
+                },
+                'required': ['reason']
+            }
+        }
+    )
+    def patch(self, request, pk):
+        try:
+            appointment = get_object_or_404(Appointment, pk=pk)
+
+            # Check if appointment can be cancelled
+            if appointment.status in ['cancelled', 'completed']:
+                return Response(
+                    {'error': f'Cannot cancel appointment with status: {appointment.status}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            reason = request.data.get('reason', 'Cancelled by staff')
+
+            # Update appointment status
+            appointment.status = 'cancelled'
+            appointment.cancelled_at = timezone.now()
+            appointment.cancelled_by = request.user
+            appointment.cancellation_reason = reason
+            appointment.save()
+
+            # Return updated appointment data
+            serializer = AppointmentSerializer(appointment)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
 class TodayAppointmentsView(generics.ListAPIView):
     """
     Today's appointments view

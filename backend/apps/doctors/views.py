@@ -204,7 +204,7 @@ class DoctorListCreateView(generics.ListCreateAPIView):
     List all doctors or create a new doctor profile
     """
     queryset = Doctor.objects.select_related('user', 'department')
-    permission_classes = [IsStaffOrAdmin]
+    permission_classes = [ReadOnlyOrAdmin]
 
     def get_serializer_class(self):
         if self.request.method == 'POST':

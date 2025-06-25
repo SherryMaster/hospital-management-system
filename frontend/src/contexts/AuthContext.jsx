@@ -187,6 +187,29 @@ export const AuthProvider = ({ children }) => {
     dispatch({ type: AUTH_ACTIONS.CLEAR_ERROR });
   }, []);
 
+  // Refresh user data function
+  const refreshUser = useCallback(async () => {
+    const token = tokenManager.getToken();
+
+    if (token) {
+      try {
+        const { data, error } = await authService.getCurrentUser();
+        if (error) {
+          throw new Error(error.message);
+        }
+        dispatch({
+          type: AUTH_ACTIONS.SET_USER,
+          payload: data,
+        });
+        return { success: true, data };
+      } catch (error) {
+        console.error('Failed to refresh user data:', error);
+        return { success: false, error: error.message };
+      }
+    }
+    return { success: false, error: 'No token found' };
+  }, []);
+
   // Context value - memoized to prevent unnecessary re-renders
   const value = useMemo(() => ({
     ...state,
@@ -194,7 +217,8 @@ export const AuthProvider = ({ children }) => {
     logout,
     register,
     clearError,
-  }), [state, login, logout, register, clearError]);
+    refreshUser,
+  }), [state, login, logout, register, clearError, refreshUser]);
 
   return (
     <AuthContext.Provider value={value}>

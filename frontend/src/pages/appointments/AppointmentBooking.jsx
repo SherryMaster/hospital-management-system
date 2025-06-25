@@ -53,7 +53,7 @@ import { useAppointments } from '../../hooks/useApi';
 import { doctorService, appointmentService, departmentService, patientService } from '../../services/api';
 
 const AppointmentBooking = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const { createAppointment } = useAppointments();
   const [activeStep, setActiveStep] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -80,7 +80,11 @@ const AppointmentBooking = () => {
   useEffect(() => {
     loadDepartments();
     loadPatientProfile();
-  }, []);
+    // Refresh user data to ensure we have the latest patient profile information
+    if (refreshUser) {
+      refreshUser();
+    }
+  }, [refreshUser]);
 
   const loadPatientProfile = async () => {
     if (user?.role !== 'patient') return;
@@ -141,16 +145,9 @@ const AppointmentBooking = () => {
       }
     } catch (error) {
       console.error('Error loading departments:', error);
-      // Fallback to simulated data on error
       setAvailableData(prev => ({
         ...prev,
-        departments: [
-          { id: 1, name: 'Cardiology', description: 'Heart and cardiovascular care' },
-          { id: 2, name: 'General Medicine', description: 'Primary healthcare services' },
-          { id: 3, name: 'Dermatology', description: 'Skin and hair care' },
-          { id: 4, name: 'Orthopedics', description: 'Bone and joint care' },
-          { id: 5, name: 'Pediatrics', description: 'Children healthcare' },
-        ],
+        departments: [],
       }));
     }
   };
@@ -165,7 +162,8 @@ const AppointmentBooking = () => {
         setAvailableData(prev => ({
           ...prev,
           doctors: result.data.results.map(doctor => ({
-            id: doctor.id,
+            id: doctor.id, // Doctor model ID
+            userId: doctor.user?.id, // User model ID (needed for appointment creation)
             name: doctor.user?.full_name || doctor.full_name || 'Unknown Doctor',
             specialization: doctor.specializations?.[0]?.name || doctor.department?.name || 'General Medicine',
             experience: doctor.years_of_experience ? `${doctor.years_of_experience} years` : 'Experience not specified',
@@ -174,45 +172,17 @@ const AppointmentBooking = () => {
           }))
         }));
       } else {
-        // Fallback to simulated data
-        const doctorsByDepartment = {
-          1: [ // Cardiology
-            { id: 1, name: 'Dr. John Smith', specialization: 'Cardiologist', experience: '15 years', rating: 4.8, fee: 200 },
-            { id: 2, name: 'Dr. Sarah Johnson', specialization: 'Cardiac Surgeon', experience: '12 years', rating: 4.9, fee: 250 },
-          ],
-          2: [ // General Medicine
-            { id: 3, name: 'Dr. Michael Brown', specialization: 'General Physician', experience: '10 years', rating: 4.7, fee: 150 },
-            { id: 4, name: 'Dr. Emily Davis', specialization: 'Family Medicine', experience: '8 years', rating: 4.6, fee: 140 },
-          ],
-          3: [ // Dermatology
-            { id: 5, name: 'Dr. Robert Wilson', specialization: 'Dermatologist', experience: '14 years', rating: 4.8, fee: 180 },
-          ],
-          4: [ // Orthopedics
-            { id: 6, name: 'Dr. Lisa Anderson', specialization: 'Orthopedic Surgeon', experience: '16 years', rating: 4.9, fee: 220 },
-          ],
-          5: [ // Pediatrics
-            { id: 7, name: 'Dr. David Miller', specialization: 'Pediatrician', experience: '11 years', rating: 4.7, fee: 160 },
-          ],
-        };
-
+        // No doctors found
         setAvailableData(prev => ({
           ...prev,
-          doctors: doctorsByDepartment[departmentId] || [],
+          doctors: [],
         }));
       }
     } catch (error) {
       console.error('Error loading doctors:', error);
-      // Fallback to simulated data on error
-      const doctorsByDepartment = {
-        1: [{ id: 1, name: 'Dr. John Smith', specialization: 'Cardiologist', experience: '15 years', rating: 4.8, fee: 200 }],
-        2: [{ id: 3, name: 'Dr. Michael Brown', specialization: 'General Physician', experience: '10 years', rating: 4.7, fee: 150 }],
-        3: [{ id: 5, name: 'Dr. Robert Wilson', specialization: 'Dermatologist', experience: '14 years', rating: 4.8, fee: 180 }],
-        4: [{ id: 6, name: 'Dr. Lisa Anderson', specialization: 'Orthopedic Surgeon', experience: '16 years', rating: 4.9, fee: 220 }],
-        5: [{ id: 7, name: 'Dr. David Miller', specialization: 'Pediatrician', experience: '11 years', rating: 4.7, fee: 160 }],
-      };
       setAvailableData(prev => ({
         ...prev,
-        doctors: doctorsByDepartment[departmentId] || [],
+        doctors: [],
       }));
     }
   };
@@ -222,53 +192,35 @@ const AppointmentBooking = () => {
       // Try to fetch real available slots from API
       const result = await appointmentService.getAvailableSlots(doctorId, date.toISOString().split('T')[0]);
 
-      if (result.data?.results || result.data) {
-        // Use API data
-        const slots = result.data.results || result.data;
+      if (result.data && result.data.available_slots) {
+        // Use API data - available_slots is an array of time strings
+        const slots = result.data.available_slots;
         setAvailableData(prev => ({
           ...prev,
-          timeSlots: slots.map((slot, index) => ({
-            id: slot.id || index + 1,
-            time: slot.time || slot.appointment_time,
-            available: slot.available !== false
+          timeSlots: slots.map((timeString, index) => ({
+            id: index + 1,
+            time: timeString,
+            available: true
           }))
         }));
-      } else {
-        // Fallback to simulated data
-        const timeSlots = [
-          { id: 1, time: '09:00', available: true },
-          { id: 2, time: '09:30', available: false },
-          { id: 3, time: '10:00', available: true },
-          { id: 4, time: '10:30', available: true },
-          { id: 5, time: '11:00', available: false },
-          { id: 6, time: '11:30', available: true },
-          { id: 7, time: '14:00', available: true },
-          { id: 8, time: '14:30', available: true },
-          { id: 9, time: '15:00', available: false },
-          { id: 10, time: '15:30', available: true },
-          { id: 11, time: '16:00', available: true },
-          { id: 12, time: '16:30', available: true },
-        ];
-
+      } else if (result.error) {
+        console.error('Error loading time slots:', result.error);
         setAvailableData(prev => ({
           ...prev,
-          timeSlots: timeSlots,
+          timeSlots: []
+        }));
+      } else {
+        // No available slots
+        setAvailableData(prev => ({
+          ...prev,
+          timeSlots: []
         }));
       }
     } catch (error) {
       console.error('Error loading time slots:', error);
-      // Fallback to simulated data on error
-      const timeSlots = [
-        { id: 1, time: '09:00', available: true },
-        { id: 2, time: '10:00', available: true },
-        { id: 3, time: '11:00', available: true },
-        { id: 4, time: '14:00', available: true },
-        { id: 5, time: '15:00', available: true },
-        { id: 6, time: '16:00', available: true },
-      ];
       setAvailableData(prev => ({
         ...prev,
-        timeSlots: timeSlots,
+        timeSlots: []
       }));
     }
   };
@@ -346,16 +298,42 @@ const AppointmentBooking = () => {
     try {
       // Prepare appointment data for API
       const selectedTimeSlot = getSelectedTimeSlot();
+      const selectedDoctor = getSelectedDoctor();
+
+      // Validate required data
+      if (!selectedDoctor?.userId) {
+        throw new Error('Selected doctor information is incomplete. Please try selecting the doctor again.');
+      }
+
+      // Check for patient profile - try multiple approaches
+      let patientId = null;
+      if (user?.patient_profile?.id) {
+        patientId = user.patient_profile.id;
+      } else if (patientProfile?.id) {
+        // Use the patientProfile from the separate API call
+        patientId = patientProfile.id;
+      } else if (user?.role === 'patient') {
+        // If user is a patient but no profile found, try to get it from the separate API call
+        console.warn('Patient profile not found in user object, but user is a patient. Checking patientProfile state...');
+        if (patientProfile?.id) {
+          patientId = patientProfile.id;
+        }
+      }
+
+      if (!patientId) {
+        throw new Error('Patient profile not found. Please ensure you are logged in as a patient and your profile is complete.');
+      }
+
       const appointmentData = {
-        patient: user?.patient_profile?.id || user?.id,
-        doctor: formData.doctor,
+        patient: patientId,
+        doctor: selectedDoctor.userId, // Use User ID, not Doctor model ID
         department: formData.department,
         appointment_date: formData.appointmentDate ? formData.appointmentDate.format('YYYY-MM-DD') : '',
         appointment_time: selectedTimeSlot?.time || formData.timeSlot,
         appointment_type: formData.appointmentType,
         chief_complaint: formData.chiefComplaint,
         notes: formData.notes,
-        status: 'pending'
+        status: 'scheduled' // Use 'scheduled' instead of 'pending'
       };
 
       // Create appointment via API
@@ -436,42 +414,48 @@ const AppointmentBooking = () => {
                 <Typography variant="h6" gutterBottom>
                   Available Doctors
                 </Typography>
-                <List>
-                  {availableData.doctors.map((doctor) => (
-                    <ListItem key={doctor.id} disablePadding>
-                      <ListItemButton
-                        selected={formData.doctor === doctor.id}
-                        onClick={() => handleInputChange('doctor', doctor.id)}
-                        sx={{ 
-                          border: 1, 
-                          borderColor: formData.doctor === doctor.id ? 'primary.main' : 'divider',
-                          borderRadius: 1,
-                          mb: 1,
-                        }}
-                      >
-                        <ListItemAvatar>
-                          <Avatar sx={{ bgcolor: 'primary.main' }}>
-                            <PersonIcon />
-                          </Avatar>
-                        </ListItemAvatar>
-                        <ListItemText
-                          primary={doctor.name}
-                          secondary={
-                            <Box>
-                              <Typography variant="body2" color="text.secondary">
-                                {doctor.specialization} • {doctor.experience}
-                              </Typography>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-                                <Chip label={`Rating: ${doctor.rating}`} size="small" color="success" />
-                                <Chip label={`Fee: $${doctor.fee}`} size="small" color="info" />
-                              </Box>
-                            </Box>
-                          }
-                        />
-                      </ListItemButton>
-                    </ListItem>
-                  ))}
-                </List>
+                {availableData.doctors.length > 0 ? (
+                  <List>
+                    {availableData.doctors.map((doctor) => (
+                      <ListItem key={doctor.id} disablePadding>
+                        <ListItemButton
+                          selected={formData.doctor === doctor.id}
+                          onClick={() => handleInputChange('doctor', doctor.id)}
+                          sx={{
+                            border: 1,
+                            borderColor: formData.doctor === doctor.id ? 'primary.main' : 'divider',
+                            borderRadius: 1,
+                            mb: 1,
+                          }}
+                        >
+                          <ListItemAvatar>
+                            <Avatar sx={{ bgcolor: 'primary.main' }}>
+                              <PersonIcon />
+                            </Avatar>
+                          </ListItemAvatar>
+                          <ListItemText
+                            primary={doctor.name}
+                            secondary={
+                              <span>
+                                <span style={{ display: 'block', color: 'rgba(0, 0, 0, 0.6)', fontSize: '0.875rem' }}>
+                                  {doctor.specialization} • {doctor.experience}
+                                </span>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                                  <Chip label={`Rating: ${doctor.rating}`} size="small" color="success" />
+                                  <Chip label={`Fee: $${doctor.fee}`} size="small" color="info" />
+                                </span>
+                              </span>
+                            }
+                          />
+                        </ListItemButton>
+                      </ListItem>
+                    ))}
+                  </List>
+                ) : (
+                  <Alert severity="info" sx={{ mt: 2 }}>
+                    No doctors available in this department. Please try selecting a different department.
+                  </Alert>
+                )}
                 {formErrors.doctor && (
                   <Typography variant="caption" color="error">
                     {formErrors.doctor}
@@ -509,21 +493,27 @@ const AppointmentBooking = () => {
                 <Typography variant="h6" gutterBottom>
                   Available Time Slots
                 </Typography>
-                <Grid container spacing={1}>
-                  {availableData.timeSlots.map((slot) => (
-                    <Grid item xs={6} sm={4} md={3} key={slot.id}>
-                      <Button
-                        fullWidth
-                        variant={formData.timeSlot === slot.id ? 'contained' : 'outlined'}
-                        disabled={!slot.available}
-                        onClick={() => handleInputChange('timeSlot', slot.id)}
-                        sx={{ py: 1.5 }}
-                      >
-                        {slot.time}
-                      </Button>
-                    </Grid>
-                  ))}
-                </Grid>
+                {availableData.timeSlots.length > 0 ? (
+                  <Grid container spacing={1}>
+                    {availableData.timeSlots.map((slot) => (
+                      <Grid item xs={6} sm={4} md={3} key={slot.id}>
+                        <Button
+                          fullWidth
+                          variant={formData.timeSlot === slot.id ? 'contained' : 'outlined'}
+                          disabled={!slot.available}
+                          onClick={() => handleInputChange('timeSlot', slot.id)}
+                          sx={{ py: 1.5 }}
+                        >
+                          {slot.time}
+                        </Button>
+                      </Grid>
+                    ))}
+                  </Grid>
+                ) : (
+                  <Alert severity="warning" sx={{ mt: 2 }}>
+                    No available time slots for the selected date and doctor. Please try a different date.
+                  </Alert>
+                )}
                 {formErrors.timeSlot && (
                   <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
                     {formErrors.timeSlot}
@@ -648,7 +638,7 @@ const AppointmentBooking = () => {
                 <Grid item xs={12} sm={6}>
                   <Typography variant="body2" color="text.secondary">Date</Typography>
                   <Typography variant="body1">
-                    {formData.appointmentDate?.toLocaleDateString()}
+                    {formData.appointmentDate?.format('MMMM D, YYYY')}
                   </Typography>
                 </Grid>
                 <Grid item xs={12} sm={6}>

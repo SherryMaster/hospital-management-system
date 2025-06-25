@@ -49,6 +49,16 @@ class User(AbstractUser):
     # Use custom manager
     objects = CustomUserManager()
 
+    # Override email field to make it unique
+    email = models.EmailField(
+        'email address',
+        unique=True,
+        help_text='Required. Enter a valid email address.',
+        error_messages={
+            'unique': "A user with this email address already exists.",
+        },
+    )
+
     class UserRole(models.TextChoices):
         ADMIN = 'admin', 'Administrator'
         DOCTOR = 'doctor', 'Doctor'

@@ -56,6 +56,23 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             raise serializers.ValidationError({
                 'email': 'No account found with this email address. Please check your email or create a new account.'
             })
+        except User.MultipleObjectsReturned:
+            # Handle duplicate email case - this should not happen with proper constraints
+            # but we'll handle it gracefully by getting the most recent active user
+            user = User.objects.filter(email=email, is_active=True).order_by('-date_joined').first()
+            if not user:
+                # If no active users, get the most recent one
+                user = User.objects.filter(email=email).order_by('-date_joined').first()
+
+            # Log this issue for admin attention
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Multiple users found with email {email}. Using most recent user ID: {user.id}")
+
+            if not user:
+                raise serializers.ValidationError({
+                    'email': 'Account configuration error. Please contact support.'
+                })
 
         # Check if account is active
         if not user.is_active:
@@ -354,6 +371,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
     phone_number = PhoneNumberField(read_only=True)
     emergency_contact_phone = PhoneNumberField(read_only=True)
 
+    # Include patient profile information for patients
+    patient_profile = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = [
@@ -364,11 +384,32 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'city', 'state', 'postal_code', 'country', 'full_address',
             'profile_picture', 'bio', 'is_verified', 'preferred_language',
             'timezone', 'receive_notifications', 'receive_email_updates',
-            'created_at', 'last_login'
+            'created_at', 'last_login', 'patient_profile'
         ]
         read_only_fields = [
             'id', 'username', 'role', 'is_verified', 'created_at', 'last_login'
         ]
+
+    def get_patient_profile(self, obj):
+        """Get patient profile information if user is a patient"""
+        if obj.role == User.UserRole.PATIENT and hasattr(obj, 'patient_profile'):
+            return {
+                'id': obj.patient_profile.id,
+                'patient_id': obj.patient_profile.patient_id,
+                'blood_type': obj.patient_profile.blood_type,
+                'height': obj.patient_profile.height,
+                'weight': obj.patient_profile.weight,
+                'marital_status': obj.patient_profile.marital_status,
+                'allergies': obj.patient_profile.allergies,
+                'chronic_conditions': obj.patient_profile.chronic_conditions,
+                'current_medications': obj.patient_profile.current_medications,
+                'family_medical_history': obj.patient_profile.family_medical_history,
+                'surgical_history': obj.patient_profile.surgical_history,
+                'age': obj.patient_profile.age,
+                'bmi': obj.patient_profile.bmi,
+                'bmi_category': obj.patient_profile.bmi_category,
+            }
+        return None
 
 
 class UserUpdateSerializer(serializers.ModelSerializer):

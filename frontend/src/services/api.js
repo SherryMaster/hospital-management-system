@@ -391,8 +391,8 @@ export const appointmentService = {
 
   getAvailableSlots: async (doctorId, date) => {
     try {
-      const response = await api.get('/appointments/available-slots/', {
-        params: { doctor: doctorId, date },
+      const response = await api.get(`/doctors/${doctorId}/availability/`, {
+        params: { date },
       });
       return { data: response.data, error: null };
     } catch (error) {
